@@ -248,3 +248,17 @@ Differences from the plan above, decided during the build:
 - **Membership access uses `current_period_end > now()` only.** Status is informational, so cancelled members keep access until the paid month ends.
 - **Auth UI is custom forms** using `authClient` from `@neondatabase/auth/next`, not the Neon Auth UI kit.
 - **Stream Chat v14** renamed `MessageInput` to `MessageComposer`.
+
+## UI-only phase (current)
+At the user's request, the app was rebuilt as UI only, with hardcoded data and no auth, database or payment calls. The visual direction follows the user's reference screenshots: near-black green-tinted surfaces, a mint accent, bold Outfit headlines, a Caveat script accent, photo-led cards, round icon chips, initials avatars for clients and a fixed trainer sidebar.
+- **Themes:** dark (default) and light. Tokens are in `globals.css` (`:root` = light, `.dark` = dark). An inline script in the root layout applies the saved choice before paint, and `ThemeToggle` (`src/components/theme.tsx`) switches it. Surfaces that sit on photos or video (sign-in photo panel, call stage, video player) force the dark tokens with a `dark` class. `?theme=light|dark` forces a theme for demos.
+- **Routes:**
+  - `(marketing)`: landing, trainers, programs, lesson player, pricing, payment callback.
+  - `(auth)`: sign-in, sign-up.
+  - `/onboarding`.
+  - `(app)` client area under the public top bar: My Library (`/dashboard`), sessions, messages, billing.
+  - `/trainer/*` studio with a sidebar: overview, programs, program editor (new/edit share one form), slots & bookings (`/trainer/availability`), clients, earnings, profile, messages, sessions.
+- **Data:** all demo data is in `src/lib/mock-data.ts`. Time-relative sets are functions, so "starts in 5 min" stays true. The root layout is `force-dynamic` for the same reason.
+- **Simulated in the browser:** uploads (local preview + fake progress), Paystack checkout (redirects to `/payments/callback`), Stream chat (local state with reactions and threads), the video call (lobby, call, ended), and the Neon Realtime feed (a fake booking arrives after 6 s).
+- **Removed for this phase:** `proxy.ts`, API routes, server actions and the `lib/*` integration modules. They are recoverable from commit `22404bd`.
+- **Earnings chart:** wide columns to match the reference: past weeks in muted green (`--chart-1`), the current week in the accent, the value labelled on the latest (or hovered/focused) column. Each column is a focusable button with an accessible label.

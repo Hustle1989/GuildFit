@@ -1,58 +1,53 @@
+import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
-import { desc, eq, sql } from "drizzle-orm";
-import { Plus, PlayCircle } from "lucide-react";
-import { Cover } from "@/components/cover";
-import { EmptyState } from "@/components/empty-state";
-import { Badge } from "@/components/ui/badge";
+import { CirclePlay, Plus, Users } from "lucide-react";
+import { PageHeader } from "@/components/app-ui";
 import { buttonVariants } from "@/components/ui/button";
-import { db, enrollments, lessons, programs } from "@/db";
-import { requireTrainer } from "@/lib/session";
+import { currentTrainer, goalLabel, programs, totalMinutes } from "@/lib/mock-data";
 
-export default async function TrainerProgramsPage() {
-  const user = await requireTrainer();
-  const rows = await db
-    .select({
-      id: programs.id,
-      title: programs.title,
-      coverUrl: programs.coverUrl,
-      published: programs.published,
-      lessonCount: sql<number>`(select count(*)::int from ${lessons} where ${lessons.programId} = ${programs.id})`,
-      enrolled: sql<number>`(select count(*)::int from ${enrollments} where ${enrollments.programId} = ${programs.id})`,
-    })
-    .from(programs)
-    .where(eq(programs.trainerId, user.id))
-    .orderBy(desc(programs.createdAt));
+export const metadata: Metadata = { title: "Your programs" };
+
+export default function TrainerProgramsPage() {
+  const mine = programs.filter((p) => p.trainerId === currentTrainer.id);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Your programs</h1>
-        <Link href="/trainer/programs/new" className={buttonVariants()}>
+    <>
+      <PageHeader title="Programs" subtitle="Create video programs. Members get every published program.">
+        <Link href="/trainer/programs/new" className={buttonVariants({ className: "h-10 px-4 font-semibold" })}>
           <Plus /> New program
         </Link>
+      </PageHeader>
+
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {mine.map((p) => (
+          <Link key={p.id} href={`/trainer/programs/${p.id}`} className="group overflow-hidden rounded-2xl border border-border bg-card transition hover:border-primary/40">
+            <div className="relative aspect-video">
+              <Image src={p.image} alt="" fill sizes="33vw" className="object-cover transition duration-500 group-hover:scale-105" />
+              <span className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-xs font-medium text-white backdrop-blur">
+                <span className={p.published ? "size-1.5 rounded-full bg-[oklch(0.84_0.19_152)]" : "size-1.5 rounded-full bg-amber-300"} />
+                {p.published ? "Published" : "Draft"}
+              </span>
+            </div>
+            <div className="space-y-2 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">{goalLabel(p.goal)} · <span className="capitalize">{p.level}</span></p>
+              <p className="text-lg font-semibold">{p.title}</p>
+              <div className="flex gap-4 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1.5"><CirclePlay className="size-4" /> {p.lessons.length} lessons · {totalMinutes(p)} min</span>
+                <span className="flex items-center gap-1.5"><Users className="size-4" /> {p.enrolled.toLocaleString()}</span>
+              </div>
+            </div>
+          </Link>
+        ))}
+
+        <Link
+          href="/trainer/programs/new"
+          className="flex min-h-72 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-foreground/15 text-muted-foreground transition hover:border-primary hover:text-primary"
+        >
+          <span className="grid size-14 place-items-center rounded-full border border-current"><Plus className="size-6" /></span>
+          <span className="font-semibold">Create a new program</span>
+        </Link>
       </div>
-      {rows.length === 0 ? (
-        <EmptyState icon={PlayCircle} title="No programs yet" description="Create your first program and upload a lesson." />
-      ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {rows.map((p) => (
-            <li key={p.id}>
-              <Link href={`/trainer/programs/${p.id}`} className="block overflow-hidden rounded-2xl border bg-card hover:border-primary/40">
-                <Cover src={p.coverUrl} alt={p.title} className="aspect-video" />
-                <div className="space-y-2 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-semibold">{p.title}</p>
-                    <Badge variant={p.published ? "default" : "outline"}>{p.published ? "Live" : "Draft"}</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {p.lessonCount} lessons · {p.enrolled} enrolled
-                  </p>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    </>
   );
 }

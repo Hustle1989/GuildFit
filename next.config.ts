@@ -13,7 +13,10 @@ const nextConfig: NextConfig = {
     },
   },
   images: {
-    remotePatterns: [{ protocol: "https", hostname: "ik.imagekit.io" }],
+    remotePatterns: [
+      { protocol: "https", hostname: "ik.imagekit.io" },
+      { protocol: "https", hostname: "images.unsplash.com" }, // mock-data photos (UI-only phase)
+    ],
   },
 };
 

@@ -4,6 +4,21 @@ A personal-training platform. Clients find trainers, buy one monthly membership 
 
 See [PLAN.md](PLAN.md) for the full spec.
 
+> **Current phase: UI only.** Every page renders from hardcoded demo data in
+> [src/lib/mock-data.ts](src/lib/mock-data.ts). Nothing talks to Neon, Paystack, Stream or ImageKit yet,
+> so `npm run dev` works with **no environment variables**. Forms, checkout, uploads,
+> chat and video calls are simulated in the browser. The previously integrated version
+> is in git commit `22404bd`. The integration steps below apply when we wire services back in.
+>
+> Demo entry points: the top bar links every area (Trainers, Programs, My Library, Messages,
+> Trainer Dashboard), and `/sign-in` has **Client** and **Trainer** shortcut buttons. The lesson
+> page has a **Preview as Visitor / Member** toggle to show the paywall.
+>
+> **Light and dark mode:** dark is the default. The sun/moon button (top bar, or the bottom of
+> the trainer sidebar) switches themes and remembers the choice. Add `?theme=light` or
+> `?theme=dark` to any URL to force one (handy for screenshots). Theme tokens live in
+> [src/app/globals.css](src/app/globals.css); the toggle is [src/components/theme.tsx](src/components/theme.tsx).
+
 | Concern | Service |
 |---|---|
 | App | Next.js 16 (App Router, server actions), Tailwind v4, shadcn/ui |

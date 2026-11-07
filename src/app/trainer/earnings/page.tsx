@@ -1,87 +1,64 @@
-import { desc, eq, sum } from "drizzle-orm";
-import { Wallet } from "lucide-react";
-import { EmptyState } from "@/components/empty-state";
-import { LocalTime } from "@/components/local-time";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { bookings, db, earnings, profiles } from "@/db";
-import { requireTrainer } from "@/lib/session";
-import { formatNaira, PLATFORM_FEE_PERCENT } from "@/lib/utils";
+import type { Metadata } from "next";
+import { Banknote, Percent, Wallet } from "lucide-react";
+import { PageHeader, Panel, StatTile } from "@/components/app-ui";
+import { EarningsChart } from "@/components/earnings-chart";
+import { UserAvatar } from "@/components/shared";
+import { getLedger, getWeeklyEarnings, people } from "@/lib/mock-data";
+import { formatDate, formatNaira, PLATFORM_FEE_PERCENT } from "@/lib/utils";
 
-export default async function EarningsPage() {
-  const user = await requireTrainer();
-  const [rows, [totals]] = await Promise.all([
-    db
-      .select({
-        id: earnings.id,
-        createdAt: earnings.createdAt,
-        grossKobo: earnings.grossKobo,
-        feeKobo: earnings.feeKobo,
-        netKobo: earnings.netKobo,
-        clientName: profiles.name,
-      })
-      .from(earnings)
-      .innerJoin(bookings, eq(bookings.id, earnings.bookingId))
-      .innerJoin(profiles, eq(profiles.id, bookings.clientId))
-      .where(eq(earnings.trainerId, user.id))
-      .orderBy(desc(earnings.createdAt)),
-    db
-      .select({ gross: sum(earnings.grossKobo).mapWith(Number), fee: sum(earnings.feeKobo).mapWith(Number), net: sum(earnings.netKobo).mapWith(Number) })
-      .from(earnings)
-      .where(eq(earnings.trainerId, user.id)),
-  ]);
+export const metadata: Metadata = { title: "Earnings" };
+
+export default function EarningsPage() {
+  const ledger = getLedger();
+  const totals = ledger.reduce((t, r) => ({ gross: t.gross + r.grossKobo, fee: t.fee + r.feeKobo, net: t.net + r.netKobo }), { gross: 0, fee: 0, net: 0 });
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Earnings</h1>
-        <p className="text-muted-foreground">
-          From 1:1 sessions, after GuildFit&apos;s {PLATFORM_FEE_PERCENT}% platform fee. Payouts are coming soon.
-        </p>
-      </div>
+    <>
+      <PageHeader title="Earnings" subtitle={`From 1:1 sessions, after GuildFit's ${PLATFORM_FEE_PERCENT}% platform fee. Payouts are coming soon.`} />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Total label="Net (yours)" kobo={totals?.net ?? 0} highlight />
-        <Total label="Gross" kobo={totals?.gross ?? 0} />
-        <Total label="Platform fees" kobo={totals?.fee ?? 0} />
+        <StatTile label="Net (yours)" value={formatNaira(totals.net)} icon={Wallet} delta="Last 30 days" highlight />
+        <StatTile label="Gross sales" value={formatNaira(totals.gross)} icon={Banknote} delta={`${ledger.length} paid sessions`} />
+        <StatTile label="Platform fees" value={formatNaira(totals.fee)} icon={Percent} delta={`${PLATFORM_FEE_PERCENT}% per session`} />
       </div>
 
-      {rows.length === 0 ? (
-        <EmptyState icon={Wallet} title="No earnings yet" description="Earnings appear here when a client pays for a session." />
-      ) : (
-        <div className="rounded-2xl border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead className="text-right">Gross</TableHead>
-                <TableHead className="text-right">Fee</TableHead>
-                <TableHead className="text-right">Net</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell><LocalTime date={r.createdAt} mode="date" /></TableCell>
-                  <TableCell>{r.clientName}</TableCell>
-                  <TableCell className="text-right">{formatNaira(r.grossKobo)}</TableCell>
-                  <TableCell className="text-right text-muted-foreground">−{formatNaira(r.feeKobo)}</TableCell>
-                  <TableCell className="text-right font-semibold text-primary">{formatNaira(r.netKobo)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+      <Panel title="Net earnings per week" className="mt-5">
+        <div className="p-5">
+          <EarningsChart data={getWeeklyEarnings().map((w) => ({ label: formatDate(w.weekStart, "short"), netKobo: w.netKobo }))} />
         </div>
-      )}
-    </div>
-  );
-}
+      </Panel>
 
-function Total({ label, kobo, highlight }: { label: string; kobo: number; highlight?: boolean }) {
-  return (
-    <div className="rounded-2xl border bg-card p-5">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className={highlight ? "mt-1 text-3xl font-black text-primary" : "mt-1 text-3xl font-black"}>{formatNaira(kobo)}</p>
-    </div>
+      <Panel title="Ledger" className="mt-5">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-muted-foreground">
+                <th className="px-5 py-3 font-medium">Date</th>
+                <th className="px-5 py-3 font-medium">Client</th>
+                <th className="px-5 py-3 text-right font-medium">Gross</th>
+                <th className="px-5 py-3 text-right font-medium">Fee</th>
+                <th className="px-5 py-3 text-right font-medium">Net</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ledger.map((row) => {
+                const client = people[row.clientId];
+                return (
+                  <tr key={row.id} className="border-b border-border/60 last:border-0">
+                    <td className="whitespace-nowrap px-5 py-3.5 text-muted-foreground">{formatDate(row.date, "date")}</td>
+                    <td className="px-5 py-3.5">
+                      <span className="flex items-center gap-2.5"><UserAvatar src={client.image} name={client.name} size={28} /> {client.name}</span>
+                    </td>
+                    <td className="px-5 py-3.5 text-right tabular-nums">{formatNaira(row.grossKobo)}</td>
+                    <td className="px-5 py-3.5 text-right tabular-nums text-muted-foreground">−{formatNaira(row.feeKobo)}</td>
+                    <td className="px-5 py-3.5 text-right font-semibold tabular-nums text-primary">{formatNaira(row.netKobo)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+    </>
   );
 }
