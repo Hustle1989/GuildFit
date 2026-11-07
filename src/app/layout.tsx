@@ -1,33 +1,35 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import { Toaster } from "sonner";
-import { Navbar } from "@/components/navbar";
+import { Caveat, Geist_Mono, Outfit } from "next/font/google";
+import { THEME_SCRIPT } from "@/lib/theme-script";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-// The navbar reads the session cookie, so every page renders per request.
+// Mock data uses times relative to "now" (e.g. a session starting in 5 minutes),
+// so render per request instead of freezing them at build time.
 export const dynamic = "force-dynamic";
 
-const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+const sans = Outfit({ variable: "--font-sans", subsets: ["latin"] });
+const script = Caveat({ variable: "--font-script", subsets: ["latin"], weight: ["600", "700"] });
+const mono = Geist_Mono({ variable: "--font-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
-  title: { default: "GuildFit: train with the best", template: "%s · GuildFit" },
+  title: { default: "GuildFit: train with the best, anywhere", template: "%s · GuildFit" },
   description:
-    "Find elite personal trainers, follow premium workout programs, chat with your coach and book 1:1 video sessions.",
+    "Elite personal trainers, step-by-step video programs and 1:1 coaching calls, all in one place and built around your schedule.",
   openGraph: { siteName: "GuildFit", type: "website" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col">
-        <Navbar />
-        <main className="flex-1">{children}</main>
-        <footer className="border-t py-8 text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} GuildFit. Built with Next.js, Neon, Paystack, Stream, ImageKit &amp; Sentry.
-        </footer>
-        <Toaster theme="dark" richColors position="top-center" />
+    // The inline script may swap "dark" for light before hydration, hence suppressHydrationWarning.
+    <html lang="en" className={`dark ${sans.variable} ${script.variable} ${mono.variable} h-full antialiased`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
+      <body className="min-h-full">
+        {children}
+        <Toaster richColors position="top-center" />
       </body>
     </html>
   );

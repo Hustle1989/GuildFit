@@ -1,56 +1,65 @@
-import { and, countDistinct, eq } from "drizzle-orm";
-import { Users } from "lucide-react";
-import { EmptyState } from "@/components/empty-state";
-import { bookings, db, enrollments, profiles, programs } from "@/db";
-import { requireTrainer } from "@/lib/session";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { MessageCircle, Search } from "lucide-react";
+import { InitialsAvatar, PageHeader, StatusPill } from "@/components/app-ui";
+import { getClients } from "@/lib/mock-data";
+import { timeAgo } from "@/lib/utils";
 
-/** Clients = anyone with a paid session with you, or enrolled in one of your programs. */
-export default async function ClientsPage() {
-  const user = await requireTrainer();
+export const metadata: Metadata = { title: "Clients" };
 
-  const [sessionClients, programClients] = await Promise.all([
-    db
-      .select({ id: profiles.id, name: profiles.name, email: profiles.email, n: countDistinct(bookings.id) })
-      .from(bookings)
-      .innerJoin(profiles, eq(profiles.id, bookings.clientId))
-      .where(and(eq(bookings.trainerId, user.id), eq(bookings.status, "paid")))
-      .groupBy(profiles.id),
-    db
-      .select({ id: profiles.id, name: profiles.name, email: profiles.email, n: countDistinct(enrollments.programId) })
-      .from(enrollments)
-      .innerJoin(programs, eq(programs.id, enrollments.programId))
-      .innerJoin(profiles, eq(profiles.id, enrollments.userId))
-      .where(eq(programs.trainerId, user.id))
-      .groupBy(profiles.id),
-  ]);
-
-  const clients = new Map<string, { name: string; email: string; sessions: number; programs: number }>();
-  for (const c of sessionClients) clients.set(c.id, { name: c.name, email: c.email, sessions: c.n, programs: 0 });
-  for (const c of programClients) {
-    const existing = clients.get(c.id);
-    clients.set(c.id, { name: c.name, email: c.email, sessions: existing?.sessions ?? 0, programs: c.n });
-  }
-
+export default function ClientsPage() {
+  const clients = getClients();
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Clients</h1>
-      {clients.size === 0 ? (
-        <EmptyState icon={Users} title="No clients yet" description="Clients appear here when they book a session or start one of your programs." />
-      ) : (
-        <ul className="divide-y rounded-2xl border bg-card">
-          {[...clients.entries()].map(([id, c]) => (
-            <li key={id} className="flex items-center justify-between px-5 py-3">
-              <div>
-                <p className="font-medium">{c.name}</p>
-                <p className="text-sm text-muted-foreground">{c.email}</p>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {c.sessions} sessions · {c.programs} programs
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <>
+      <PageHeader title="Clients" subtitle="Everyone who's booked a session with you or started one of your programs." />
+
+      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
+          <p className="font-semibold">{clients.length} clients</p>
+          <div className="relative w-full max-w-xs">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input placeholder="Search clients" className="h-9 w-full rounded-lg border border-border bg-background/50 pl-9 pr-3 text-sm outline-none focus:border-primary/50" />
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-muted-foreground">
+                <th className="px-5 py-3 font-medium">Client</th>
+                <th className="px-5 py-3 font-medium">Goal</th>
+                <th className="px-5 py-3 text-right font-medium">Sessions</th>
+                <th className="px-5 py-3 text-right font-medium">Programs</th>
+                <th className="px-5 py-3 font-medium">Last active</th>
+                <th className="px-5 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {clients.map((c) => (
+                <tr key={c.id} className="border-b border-border/60 transition last:border-0 hover:bg-foreground/[0.02]">
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <InitialsAvatar name={c.name} size={38} />
+                      <div>
+                        <p className="font-medium">{c.name}</p>
+                        <p className="text-xs text-muted-foreground">{c.email}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3.5"><StatusPill tone="muted">{c.goal}</StatusPill></td>
+                  <td className="px-5 py-3.5 text-right tabular-nums">{c.sessions}</td>
+                  <td className="px-5 py-3.5 text-right tabular-nums">{c.programs}</td>
+                  <td className="px-5 py-3.5 text-muted-foreground">{timeAgo(c.lastActive)}</td>
+                  <td className="px-5 py-3.5 text-right">
+                    <Link href="/trainer/messages" className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:border-primary hover:text-primary">
+                      <MessageCircle className="size-3.5" /> Message
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
   );
 }

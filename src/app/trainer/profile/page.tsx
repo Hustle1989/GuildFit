@@ -1,36 +1,40 @@
+import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
-import { eq } from "drizzle-orm";
-import { ActionForm } from "@/components/action-form";
-import { SubmitButton } from "@/components/submit-button";
-import { TrainerProfileFields } from "@/components/trainer-profile-fields";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Uploader } from "@/components/uploader";
-import { db, trainerProfiles } from "@/db";
-import { requireTrainer } from "@/lib/session";
-import { updateTrainerProfile } from "./actions";
+import { MapPin, Users } from "lucide-react";
+import { PageHeader } from "@/components/app-ui";
+import { currentTrainer } from "@/lib/mock-data";
+import { formatNaira } from "@/lib/utils";
+import { ProfileForm } from "./profile-form";
 
-export default async function TrainerProfilePage() {
-  const user = await requireTrainer();
-  const [profile] = await db.select().from(trainerProfiles).where(eq(trainerProfiles.userId, user.id));
+export const metadata: Metadata = { title: "Profile" };
 
+export default function TrainerProfilePage() {
+  const t = currentTrainer;
   return (
-    <div className="max-w-2xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Public profile</h1>
-        {profile && (
-          <Link href={`/trainers/${profile.slug}`} className="text-sm text-primary hover:underline">View public page</Link>
-        )}
+    <>
+      <PageHeader title="Public profile" subtitle="How clients see you on GuildFit." />
+      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+        <ProfileForm trainer={t} />
+
+        <aside className="space-y-3 lg:sticky lg:top-24 lg:self-start">
+          <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Card preview</p>
+          <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-border">
+            <Image src={t.image} alt={t.name} fill sizes="400px" className="object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 space-y-2 p-5 text-white">
+              <p className="eyebrow text-mint">{t.title}</p>
+              <h3 className="text-2xl font-semibold">{t.name}</h3>
+              <div className="flex gap-4 text-xs text-white/75">
+                <span className="flex items-center gap-1"><MapPin className="size-3.5" /> {t.location}</span>
+                <span className="flex items-center gap-1"><Users className="size-3.5" /> {t.clients}+ clients</span>
+              </div>
+              <p className="pt-2 text-sm">1:1 from <span className="text-mint font-semibold">{formatNaira(t.sessionPriceKobo)}</span></p>
+            </div>
+          </div>
+          <Link href={`/trainers/${t.slug}`} className="block text-center text-sm font-semibold text-primary hover:underline">Open public page</Link>
+        </aside>
       </div>
-      <ActionForm action={updateTrainerProfile} successMessage="Profile saved" className="space-y-6">
-        <div className="space-y-1.5">
-          <Label htmlFor="name">Display name</Label>
-          <Input id="name" name="name" defaultValue={user.name} required />
-        </div>
-        <Uploader name="avatarUrl" kind="image" folder="/guildfit/avatars" label="Profile photo" defaultValue={user.image} />
-        <TrainerProfileFields defaults={profile} />
-        <SubmitButton size="lg">Save profile</SubmitButton>
-      </ActionForm>
-    </div>
+    </>
   );
 }
