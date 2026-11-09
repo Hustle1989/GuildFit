@@ -4,24 +4,20 @@ import { ProgramCard } from "@/components/cards";
 import { FilterBar } from "@/components/filter-bar";
 import { PageHero } from "@/components/page-hero";
 import { EmptyState } from "@/components/shared";
-import { publishedPrograms, trainerById, type GoalKey, type Level } from "@/lib/mock-data";
+import { listPrograms } from "@/lib/queries";
+import { isGoal, isLevel, LEVELS } from "@/lib/types";
 
 export const metadata: Metadata = {
   title: "Workout programs",
   description: "Video workout programs from GuildFit coaches. One membership unlocks them all.",
 };
 
-const LEVELS = ["beginner", "intermediate", "advanced"] as const;
-
 export default async function ProgramsPage({ searchParams }: PageProps<"/programs">) {
-  const { q, goal, level } = (await searchParams) as { q?: string; goal?: GoalKey; level?: Level };
-  const query = q?.toLowerCase().trim();
-  const results = publishedPrograms.filter(
-    (p) =>
-      (!goal || p.goal === goal) &&
-      (!level || p.level === level) &&
-      (!query || `${p.title} ${p.tagline} ${trainerById(p.trainerId)?.name}`.toLowerCase().includes(query)),
-  );
+  const params = await searchParams;
+  const q = typeof params.q === "string" ? params.q.slice(0, 80) : undefined;
+  const goal = isGoal(params.goal) ? params.goal : undefined;
+  const level = isLevel(params.level) ? params.level : undefined;
+  const results = await listPrograms({ q, goal, level });
 
   return (
     <>

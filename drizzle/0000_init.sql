@@ -48,8 +48,8 @@ CREATE TABLE "lessons" (
 	"title" text NOT NULL,
 	"notes" text DEFAULT '' NOT NULL,
 	"video_path" text,
-	"duration_sec" integer,
-	CONSTRAINT "lessons_program_id_position_unique" UNIQUE("program_id","position")
+	"duration_sec" integer DEFAULT 600 NOT NULL,
+	CONSTRAINT "lessons_program_position_unique" UNIQUE("program_id","position")
 );
 --> statement-breakpoint
 CREATE TABLE "memberships" (
@@ -59,6 +59,7 @@ CREATE TABLE "memberships" (
 	"email_token" text,
 	"status" "membership_status" NOT NULL,
 	"current_period_end" timestamp with time zone NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "memberships_subscription_code_unique" UNIQUE("subscription_code")
 );
 --> statement-breakpoint
@@ -68,6 +69,7 @@ CREATE TABLE "profiles" (
 	"name" text NOT NULL,
 	"avatar_url" text,
 	"role" "role",
+	"goal" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "profiles_email_unique" UNIQUE("email")
 );
@@ -77,8 +79,12 @@ CREATE TABLE "programs" (
 	"trainer_id" text NOT NULL,
 	"slug" text NOT NULL,
 	"title" text NOT NULL,
-	"description" text NOT NULL,
+	"tagline" text DEFAULT '' NOT NULL,
+	"description" text DEFAULT '' NOT NULL,
+	"goal" text DEFAULT 'strength' NOT NULL,
 	"level" "level" DEFAULT 'beginner' NOT NULL,
+	"weeks" integer DEFAULT 4 NOT NULL,
+	"outcomes" text[] DEFAULT '{}' NOT NULL,
 	"cover_url" text,
 	"published" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -97,10 +103,16 @@ CREATE TABLE "slots" (
 CREATE TABLE "trainer_profiles" (
 	"user_id" text PRIMARY KEY NOT NULL,
 	"slug" text NOT NULL,
-	"headline" text NOT NULL,
-	"bio" text NOT NULL,
-	"specialties" text[] DEFAULT '{}' NOT NULL,
-	"cover_url" text,
+	"title" text DEFAULT 'Personal trainer' NOT NULL,
+	"headline" text DEFAULT '' NOT NULL,
+	"bio" text DEFAULT '' NOT NULL,
+	"goals" text[] DEFAULT '{}' NOT NULL,
+	"location" text DEFAULT '' NOT NULL,
+	"years_experience" integer DEFAULT 1 NOT NULL,
+	"clients_coached" integer DEFAULT 0 NOT NULL,
+	"session_price_kobo" integer DEFAULT 1500000 NOT NULL,
+	"certifications" text[] DEFAULT '{}' NOT NULL,
+	"photo_url" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "trainer_profiles_slug_unique" UNIQUE("slug")
 );
@@ -110,11 +122,11 @@ CREATE TABLE "webhook_events" (
 	"received_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "bookings" ADD CONSTRAINT "bookings_slot_id_slots_id_fk" FOREIGN KEY ("slot_id") REFERENCES "public"."slots"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "bookings" ADD CONSTRAINT "bookings_client_id_profiles_id_fk" FOREIGN KEY ("client_id") REFERENCES "public"."profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "bookings" ADD CONSTRAINT "bookings_trainer_id_profiles_id_fk" FOREIGN KEY ("trainer_id") REFERENCES "public"."profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "earnings" ADD CONSTRAINT "earnings_trainer_id_profiles_id_fk" FOREIGN KEY ("trainer_id") REFERENCES "public"."profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "earnings" ADD CONSTRAINT "earnings_booking_id_bookings_id_fk" FOREIGN KEY ("booking_id") REFERENCES "public"."bookings"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "bookings" ADD CONSTRAINT "bookings_slot_id_slots_id_fk" FOREIGN KEY ("slot_id") REFERENCES "public"."slots"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "bookings" ADD CONSTRAINT "bookings_client_id_profiles_id_fk" FOREIGN KEY ("client_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "bookings" ADD CONSTRAINT "bookings_trainer_id_profiles_id_fk" FOREIGN KEY ("trainer_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "earnings" ADD CONSTRAINT "earnings_trainer_id_profiles_id_fk" FOREIGN KEY ("trainer_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "earnings" ADD CONSTRAINT "earnings_booking_id_bookings_id_fk" FOREIGN KEY ("booking_id") REFERENCES "public"."bookings"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "enrollments" ADD CONSTRAINT "enrollments_user_id_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "enrollments" ADD CONSTRAINT "enrollments_program_id_programs_id_fk" FOREIGN KEY ("program_id") REFERENCES "public"."programs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "lesson_progress" ADD CONSTRAINT "lesson_progress_user_id_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -123,4 +135,9 @@ ALTER TABLE "lessons" ADD CONSTRAINT "lessons_program_id_programs_id_fk" FOREIGN
 ALTER TABLE "memberships" ADD CONSTRAINT "memberships_user_id_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "programs" ADD CONSTRAINT "programs_trainer_id_profiles_id_fk" FOREIGN KEY ("trainer_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "slots" ADD CONSTRAINT "slots_trainer_id_profiles_id_fk" FOREIGN KEY ("trainer_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "trainer_profiles" ADD CONSTRAINT "trainer_profiles_user_id_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "trainer_profiles" ADD CONSTRAINT "trainer_profiles_user_id_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "bookings_trainer_idx" ON "bookings" USING btree ("trainer_id");--> statement-breakpoint
+CREATE INDEX "bookings_client_idx" ON "bookings" USING btree ("client_id");--> statement-breakpoint
+CREATE INDEX "earnings_trainer_idx" ON "earnings" USING btree ("trainer_id");--> statement-breakpoint
+CREATE INDEX "programs_trainer_idx" ON "programs" USING btree ("trainer_id");--> statement-breakpoint
+CREATE INDEX "slots_trainer_starts_idx" ON "slots" USING btree ("trainer_id","starts_at");

@@ -1,5 +1,5 @@
 {
-  "id": "daf05c29-cda5-476c-8af9-7116c0214756",
+  "id": "6443cc0d-907d-4a4b-aac1-7460ac5b339b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -67,7 +67,38 @@
           "notNull": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "bookings_trainer_idx": {
+          "name": "bookings_trainer_idx",
+          "columns": [
+            {
+              "expression": "trainer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "bookings_client_idx": {
+          "name": "bookings_client_idx",
+          "columns": [
+            {
+              "expression": "client_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "bookings_slot_id_slots_id_fk": {
           "name": "bookings_slot_id_slots_id_fk",
@@ -79,7 +110,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         },
         "bookings_client_id_profiles_id_fk": {
@@ -92,7 +123,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         },
         "bookings_trainer_id_profiles_id_fk": {
@@ -105,7 +136,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
@@ -179,7 +210,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "earnings_trainer_idx": {
+          "name": "earnings_trainer_idx",
+          "columns": [
+            {
+              "expression": "trainer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "earnings_trainer_id_profiles_id_fk": {
           "name": "earnings_trainer_id_profiles_id_fk",
@@ -191,7 +238,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         },
         "earnings_booking_id_bookings_id_fk": {
@@ -204,7 +251,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
@@ -402,7 +449,8 @@
           "name": "duration_sec",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": 600
         }
       },
       "indexes": {},
@@ -423,8 +471,8 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "lessons_program_id_position_unique": {
-          "name": "lessons_program_id_position_unique",
+        "lessons_program_position_unique": {
+          "name": "lessons_program_position_unique",
           "nullsNotDistinct": false,
           "columns": [
             "program_id",
@@ -476,6 +524,13 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         }
       },
       "indexes": {},
@@ -543,6 +598,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "goal": {
+          "name": "goal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -596,11 +657,26 @@
           "primaryKey": false,
           "notNull": true
         },
+        "tagline": {
+          "name": "tagline",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
         "description": {
           "name": "description",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "''"
+        },
+        "goal": {
+          "name": "goal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'strength'"
         },
         "level": {
           "name": "level",
@@ -609,6 +685,20 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'beginner'"
+        },
+        "weeks": {
+          "name": "weeks",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 4
+        },
+        "outcomes": {
+          "name": "outcomes",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
         },
         "cover_url": {
           "name": "cover_url",
@@ -631,7 +721,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "programs_trainer_idx": {
+          "name": "programs_trainer_idx",
+          "columns": [
+            {
+              "expression": "trainer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "programs_trainer_id_profiles_id_fk": {
           "name": "programs_trainer_id_profiles_id_fk",
@@ -704,7 +810,29 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "slots_trainer_starts_idx": {
+          "name": "slots_trainer_starts_idx",
+          "columns": [
+            {
+              "expression": "trainer_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "starts_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "slots_trainer_id_profiles_id_fk": {
           "name": "slots_trainer_id_profiles_id_fk",
@@ -742,27 +870,71 @@
           "primaryKey": false,
           "notNull": true
         },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Personal trainer'"
+        },
         "headline": {
           "name": "headline",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "''"
         },
         "bio": {
           "name": "bio",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "''"
         },
-        "specialties": {
-          "name": "specialties",
+        "goals": {
+          "name": "goals",
           "type": "text[]",
           "primaryKey": false,
           "notNull": true,
           "default": "'{}'"
         },
-        "cover_url": {
-          "name": "cover_url",
+        "location": {
+          "name": "location",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "years_experience": {
+          "name": "years_experience",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "clients_coached": {
+          "name": "clients_coached",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "session_price_kobo": {
+          "name": "session_price_kobo",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1500000
+        },
+        "certifications": {
+          "name": "certifications",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
+        "photo_url": {
+          "name": "photo_url",
           "type": "text",
           "primaryKey": false,
           "notNull": false

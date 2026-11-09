@@ -1,14 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { Banknote, Clock, Plus, Trash, Video } from "lucide-react";
+import { Banknote, Clock, Loader2, Plus, Trash, Video } from "lucide-react";
 import { toast } from "sonner";
 import { InitialsAvatar, StatusPill } from "@/components/app-ui";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatDate, formatNaira } from "@/lib/utils";
+import { addSlot, deleteSlot } from "../actions";
 
 export type SlotRow = {
   id: string;
@@ -16,11 +17,14 @@ export type SlotRow = {
   durationMin: number;
   priceKobo: number;
   status: "open" | "held" | "booked";
+  bookingId?: string | null;
   client?: { name: string };
 };
 
-export function AvailabilityManager({ initialSlots }: { initialSlots: SlotRow[] }) {
+export function AvailabilityManager({ initialSlots, defaultPriceNaira }: { initialSlots: SlotRow[]; defaultPriceNaira: number }) {
   const [slots, setSlots] = useState(initialSlots);
+  const [adding, startAdding] = useTransition();
+  const [removing, setRemoving] = useState<string | null>(null);
 
   const byDay = useMemo(() => {
     const map = new Map<string, SlotRow[]>();
@@ -40,26 +44,30 @@ export function AvailabilityManager({ initialSlots }: { initialSlots: SlotRow[] 
           className="space-y-4 rounded-2xl border border-border bg-card p-5"
           onSubmit={(e) => {
             e.preventDefault();
-            const data = new FormData(e.currentTarget);
+            const form = e.currentTarget;
+            const data = new FormData(form);
             const local = String(data.get("startsAt"));
-            if (new Date(local).getTime() < Date.now()) return toast.error("Pick a time in the future.");
-            setSlots((s) => [
-              ...s,
-              {
-                id: crypto.randomUUID(),
-                startsAt: new Date(local).toISOString(), // browser local time -> UTC
-                durationMin: Number(data.get("duration")),
-                priceKobo: Number(data.get("price")) * 100,
-                status: "open",
-              },
-            ]);
-            e.currentTarget.reset();
-            toast.success("Slot added. Clients can book it now.");
+            // GuildFit shows every time in Lagos time (WAT, UTC+1, no daylight saving), so read the input the same way.
+            const startsAt = local ? new Date(`${local}:00+01:00`) : null;
+            if (!startsAt || Number.isNaN(startsAt.getTime()) || startsAt.getTime() < Date.now()) return toast.error("Pick a time in the future.");
+            startAdding(async () => {
+              const result = await addSlot({
+                startsAt: startsAt.toISOString(), // WAT -> UTC
+                durationMin: Number(data.get("duration")) as 30 | 45 | 60,
+                priceNaira: Number(data.get("price")),
+              });
+              if (!result.ok) return void toast.error(result.error);
+              setSlots((s) => [...s, { ...result.slot, status: "open" }]);
+              form.reset();
+              toast.success("Slot added. Clients can book it now.");
+            });
           }}
         >
           <h2 className="font-semibold">Add a slot</h2>
           <div className="space-y-1.5">
-            <Label htmlFor="startsAt">Date &amp; time</Label>
+            <Label htmlFor="startsAt">
+              Date &amp; time <span className="font-normal text-muted-foreground">(Lagos time, WAT)</span>
+            </Label>
             <Input id="startsAt" name="startsAt" type="datetime-local" required className="h-10" />
           </div>
           <div className="divide-y divide-border/60 text-sm">
@@ -84,7 +92,7 @@ export function AvailabilityManager({ initialSlots }: { initialSlots: SlotRow[] 
                   type="number"
                   min={1000}
                   step={500}
-                  defaultValue={15000}
+                  defaultValue={defaultPriceNaira}
                   required
                   aria-label="Price in naira"
                   className="field-sizing-content min-w-10 bg-transparent text-right tabular-nums outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
@@ -92,8 +100,8 @@ export function AvailabilityManager({ initialSlots }: { initialSlots: SlotRow[] 
               </span>
             </label>
           </div>
-          <Button type="submit" className="glow h-10 w-full rounded-xl font-semibold">
-            <Plus /> Add slot
+          <Button type="submit" className="glow h-10 w-full rounded-xl font-semibold" disabled={adding}>
+            {adding ? <Loader2 className="animate-spin" /> : <Plus />} Add slot
           </Button>
         </form>
 
@@ -136,7 +144,7 @@ export function AvailabilityManager({ initialSlots }: { initialSlots: SlotRow[] 
                   <span className="ml-auto flex w-[92px] justify-end sm:ml-0">
                     {slot.status === "booked" && (
                       <Link
-                        href={`/trainer/sessions/${slot.id}`}
+                        href={`/trainer/sessions/${slot.bookingId}`}
                         className={buttonVariants({ variant: "outline", className: "h-8 gap-1.5 px-3 text-xs font-medium" })}
                       >
                         <Video className="size-3.5" /> Join call
@@ -148,12 +156,17 @@ export function AvailabilityManager({ initialSlots }: { initialSlots: SlotRow[] 
                         size="icon-sm"
                         aria-label={`Delete ${formatDate(slot.startsAt)} slot`}
                         className="text-muted-foreground hover:text-destructive"
-                        onClick={() => {
+                        disabled={removing === slot.id}
+                        onClick={async () => {
+                          setRemoving(slot.id);
+                          const result = await deleteSlot(slot.id);
+                          setRemoving(null);
+                          if (!result.ok) return void toast.error(result.error);
                           setSlots((s) => s.filter((x) => x.id !== slot.id));
                           toast.success("Slot removed");
                         }}
                       >
-                        <Trash />
+                        {removing === slot.id ? <Loader2 className="animate-spin" /> : <Trash />}
                       </Button>
                     )}
                   </span>

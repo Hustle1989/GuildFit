@@ -7,24 +7,26 @@ import { MarkCompleteButton } from "@/components/mark-complete-button";
 import { UserAvatar } from "@/components/shared";
 import { buttonVariants } from "@/components/ui/button";
 import { VideoPlayer } from "@/components/video-player";
-import { myPrograms, programBySlug, trainerById } from "@/lib/mock-data";
-import { cn, formatNaira, MEMBERSHIP_PRICE_KOBO } from "@/lib/utils";
+import { getCompletedLessonIds, getMembership, getProgramBySlug, isMembershipActive } from "@/lib/queries";
+import { getCurrentUser } from "@/lib/session";
+import { formatNaira, MEMBERSHIP_PRICE_KOBO } from "@/lib/utils";
 
-export default async function LessonPage({ params, searchParams }: PageProps<"/programs/[slug]/lessons/[lessonId]">) {
+export default async function LessonPage({ params }: PageProps<"/programs/[slug]/lessons/[lessonId]">) {
   const { slug, lessonId } = await params;
-  const { view } = (await searchParams) as { view?: string };
-  const program = programBySlug(slug);
+  const [program, viewer] = await Promise.all([getProgramBySlug(slug), getCurrentUser()]);
+  const isOwner = !!program && viewer?.id === program.trainerId;
   const index = program?.lessons.findIndex((l) => l.id === lessonId) ?? -1;
-  if (!program || index < 0) notFound();
+  if (!program || index < 0 || (!program.published && !isOwner)) notFound();
 
+  // Access: the first lesson is a free preview; the rest need an active membership (or owning the program).
+  const [membership, done] = viewer ? await Promise.all([getMembership(viewer.id), getCompletedLessonIds(viewer.id, program.id)]) : [null, new Set<string>()];
+  const unlocked = isOwner || isMembershipActive(membership);
   const lesson = program.lessons[index];
-  const trainer = trainerById(program.trainerId);
-  const isMember = view === "member";
-  const locked = index > 0 && !isMember;
-  const completed = isMember ? (myPrograms.find((p) => p.programId === program.id)?.completed ?? 0) : 0;
+  const trainer = program.trainer;
+  const locked = index > 0 && !unlocked;
+  const completed = done.size;
   const next = program.lessons[index + 1];
-  const qs = isMember ? "?view=member" : "";
-  const lessonHref = (id: string) => `/programs/${program.slug}/lessons/${id}${qs}`;
+  const lessonHref = (id: string) => `/programs/${program.slug}/lessons/${id}`;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -32,22 +34,15 @@ export default async function LessonPage({ params, searchParams }: PageProps<"/p
         <Link href={`/programs/${program.slug}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
           <ArrowLeft className="size-4" /> {program.title}
         </Link>
-        {/* Demo-only toggle to preview both access states */}
-        <div className="flex items-center gap-2 rounded-full border border-border bg-card p-1 text-xs">
-          <span className="pl-2 text-muted-foreground">Preview as</span>
-          {[
-            ["visitor", "Visitor", `/programs/${program.slug}/lessons/${lesson.id}`],
-            ["member", "Member", `/programs/${program.slug}/lessons/${lesson.id}?view=member`],
-          ].map(([key, label, href]) => (
-            <Link
-              key={key}
-              href={href}
-              className={cn("rounded-full px-3 py-1.5 font-semibold", (isMember ? "member" : "visitor") === key ? "bg-primary text-primary-foreground" : "text-muted-foreground")}
-            >
-              {label}
-            </Link>
-          ))}
-        </div>
+        {!viewer ? (
+          <Link href="/sign-in" className="text-sm font-semibold text-primary hover:underline">
+            Sign in to track progress
+          </Link>
+        ) : !unlocked ? (
+          <Link href="/pricing" className="text-sm font-semibold text-primary hover:underline">
+            Become a member to unlock every lesson
+          </Link>
+        ) : null}
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -84,7 +79,7 @@ export default async function LessonPage({ params, searchParams }: PageProps<"/p
             </div>
             {!locked && (
               <div className="flex gap-2">
-                <MarkCompleteButton />
+                {viewer && <MarkCompleteButton lessonId={lesson.id} done={done.has(lesson.id)} />}
                 {next && (
                   <Link href={lessonHref(next.id)} className={buttonVariants({ size: "lg", variant: "outline", className: "h-11 px-4" })}>
                     Next <ArrowRight />
@@ -131,10 +126,10 @@ export default async function LessonPage({ params, searchParams }: PageProps<"/p
                     index={i + 1}
                     title={l.title}
                     durationMin={l.durationMin}
-                    locked={i > 0 && !isMember}
-                    free={i === 0 && !isMember}
+                    locked={i > 0 && !unlocked}
+                    free={i === 0 && !unlocked}
                     active={l.id === lesson.id}
-                    done={i < completed}
+                    done={done.has(l.id)}
                   />
                 </li>
               ))}

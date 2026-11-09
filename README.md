@@ -4,90 +4,96 @@ A personal-training platform. Clients find trainers, buy one monthly membership 
 
 See [PLAN.md](PLAN.md) for the full spec.
 
-> **Current phase: UI only.** Every page renders from hardcoded demo data in
-> [src/lib/mock-data.ts](src/lib/mock-data.ts). Nothing talks to Neon, Paystack, Stream or ImageKit yet,
-> so `npm run dev` works with **no environment variables**. Forms, checkout, uploads,
-> chat and video calls are simulated in the browser. The previously integrated version
-> is in git commit `22404bd`. The integration steps below apply when we wire services back in.
->
-> Demo entry points: the top bar links every area (Trainers, Programs, My Library, Messages,
-> Trainer Dashboard), and `/sign-in` has **Client** and **Trainer** shortcut buttons. The lesson
-> page has a **Preview as Visitor / Member** toggle to show the paywall.
->
-> **Light and dark mode:** dark is the default. The sun/moon button (top bar, or the bottom of
-> the trainer sidebar) switches themes and remembers the choice. Add `?theme=light` or
-> `?theme=dark` to any URL to force one (handy for screenshots). Theme tokens live in
-> [src/app/globals.css](src/app/globals.css); the toggle is [src/components/theme.tsx](src/components/theme.tsx).
+## Status
 
-| Concern | Service |
-|---|---|
-| App | Next.js 16 (App Router, server actions), Tailwind v4, shadcn/ui |
-| Database | Neon Postgres + Drizzle ORM |
-| Auth | Neon Auth (email/password + Google) |
-| Realtime | Neon Realtime: live bookings feed on the trainer dashboard |
-| Payments | Paystack: monthly membership plan + one-time session payments |
-| Chat & video | Stream: chat (threads, replies, reactions) + 1:1 video calls |
-| Media | ImageKit: browser uploads, optimized images, private lesson videos via signed URLs |
-| Monitoring | Sentry: errors, tracing, Session Replay, Seer |
-| Hosting | Cloudways Velocity (managed Node.js) |
+| Concern | Service | State |
+|---|---|---|
+| App | Next.js 16 (App Router, server actions), Tailwind v4, shadcn/ui | ✅ |
+| Database | Neon (Lakebase Postgres) + Drizzle ORM over `pg` | ✅ live, seeded |
+| Auth | Neon Auth (Managed Better Auth): email/password + Google | ✅ live |
+| Realtime | Neon Realtime: live bookings feed on the trainer dashboard | ✅ live |
+| Payments | Paystack: membership + 1:1 sessions | ⏳ simulated: checkout writes the same rows Paystack will |
+| Chat & video | Stream | ⏳ simulated in the browser (sample conversations, mock call room) |
+| Media | ImageKit | ⏳ uploads preview locally; images are Unsplash URLs |
+| Monitoring | Sentry | ⏳ configured, needs a DSN |
+| Hosting | Cloudways Velocity | ⏳ |
 
-## 1. Accounts and keys
+Light and dark mode: dark is the default; the sun/moon button switches and remembers it. `?theme=light|dark` forces one.
 
-Copy `.env.example` to `.env.local` and fill it in:
+## 1. Set up Neon
 
-1. **Neon**: create a project in **aws-eu-central-1**. Use a dev branch for local work and copy its connection string to `DATABASE_URL`.
-   - Enable **Auth**, copy the Auth URL to `NEON_AUTH_BASE_URL`, and add Google as a provider.
-   - Set `NEON_AUTH_COOKIE_SECRET` to any random string of 32+ characters.
-   - Enable **Realtime** and copy `NEON_REALTIME_SECRET` and the WebSocket URL (`NEXT_PUBLIC_NEON_REALTIME_URL`). Add `http://localhost:3000` to its allowed origins. Without Realtime, the trainer dashboard falls back to refreshing every 15 seconds.
-2. **Paystack** (test mode): copy the secret key, then create a monthly **₦5,000** plan and copy its plan code.
-3. **Stream**: create an app and copy the API key and secret. Chat and video share them.
-4. **ImageKit**: copy the URL endpoint, public key and private key.
-5. **Sentry**: create a Next.js project and copy the DSN, org and project slugs, and an auth token for source maps. For the Seer demo, connect GitHub in Sentry.
+This repo is linked to the Neon project **GuildFit** (`dark-cloud-93391236`, branch `production`, aws-us-east-2). [neon.ts](neon.ts) declares the services.
+
+```bash
+npm i -g neon            # Neon CLI
+neon login               # once, in a browser
+neon link --project-id dark-cloud-93391236 --branch production   # fresh clone only (.neon is git-ignored)
+neon deploy              # applies neon.ts and pulls DATABASE_URL, NEON_AUTH_*, NEON_REALTIME_* … into .env.local
+```
+
+Then add the app settings to `.env.local` (see [.env.example](.env.example)):
+
+```bash
+NEON_AUTH_COOKIE_SECRET=<openssl rand -base64 32>
+NEXT_PUBLIC_NEON_REALTIME_URL=$NEON_REALTIME_URL
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
 
 ## 2. Run locally
 
 ```bash
 npm install
-npm run db:migrate    # apply drizzle/0000_init.sql to Neon
-                      # (after schema changes: npm run db:generate, then db:migrate)
-npm run db:seed       # optional demo trainers, programs and slots
+npm run db:migrate    # apply drizzle/ migrations (uses DATABASE_URL_UNPOOLED)
+npm run db:seed       # demo accounts + data; safe to re-run (refreshes demo-owned rows)
 npm run dev
 ```
 
-**Paystack webhooks** need a public URL. Run a tunnel such as `ngrok http 3000`, then set the Paystack test webhook URL to `https://<tunnel>/api/webhooks/paystack`. Payments also confirm on the callback page, so checkout works without the tunnel. Subscription lifecycle events need the webhook.
+After schema changes: `npm run db:generate`, then `npm run db:migrate`.
 
-Seed media (optional): upload sample images and a short MP4 to ImageKit (mark the video **private**), then set `SEED_IMAGE_BASE` and `SEED_VIDEO_PATH` before seeding. See `scripts/seed.ts`.
+### Demo accounts
+
+`npm run db:seed` creates real Neon Auth accounts (password `GuildFit-demo-2026`, or `SEED_DEMO_PASSWORD`):
+
+| Who | Email | What they have |
+|---|---|---|
+| Trainer | `amara@guildfit.test` | 3 programs (1 draft), a week of slots, 8 weeks of paid sessions and earnings |
+| Client | `ada@guildfit.test` | Active membership, 3 programs in progress, a session starting in ~5 minutes |
+| Others | `tunde@`, `zainab@`, `chidi@`, `kemi@`, `david@` (trainers); `emeka@`, `funmi@`, `grace@`, `daniel@`, `sarah@`, `michael@` (clients) | |
+
+The **Client** / **Trainer** shortcuts on `/sign-in` sign in as Ada and Amara (hide them with `DEMO_LOGIN=off`). Times are relative to when you seed, so re-run the seed before a demo to get a session in the join window.
+
+**See realtime work:** sign in as Amara in one browser (`/trainer`), as any client in another (private window), and book one of Amara's slots from `/trainers/amara-okafor`. The booking appears in Amara's **Live bookings** feed with a toast, no refresh.
 
 ## 3. How the important parts work
 
-- **Access rules** ([src/lib/access.ts](src/lib/access.ts)): the first lesson of each program is free. Other lessons need a membership whose `current_period_end` is in the future, so a cancelled member keeps access until the month ends. Trainers always see their own lessons.
-- **Payments** ([src/lib/payments.ts](src/lib/payments.ts)): `fulfillPayment(reference)` verifies with Paystack and is idempotent. Both the callback page and the webhook call it.
-  - Webhooks are HMAC-SHA512 verified and de-duplicated in `webhook_events`.
-  - Earnings have a unique `booking_id`, so a payment is never credited twice.
-- **Booking** ([src/app/trainers/[slug]/actions.ts](src/app/trainers/[slug]/actions.ts)): booking locks the slot row, holds the slot for 15 minutes, takes the price from the DB, then redirects to Paystack. `bookings.slot_id` is unique, so a slot can never be double-booked.
-- **Video calls** ([src/app/sessions/[bookingId]](src/app/sessions/[bookingId])): the Stream call id is the booking id, and the members are the client and trainer only. Join opens 10 minutes before the start and closes when the slot ends.
-- **Realtime** ([src/lib/realtime.ts](src/lib/realtime.ts)): the server seals a trainer-scoped query, and the browser subscribes with `useLiveQuery`. Renewals go through `/api/trainer/live-bookings`, which re-checks the session.
-- **Uploads** ([src/components/uploader.tsx](src/components/uploader.tsx)): the browser uploads straight to ImageKit with short-lived params from `/api/upload-auth`. Lesson videos are private and are only played through 1-hour signed URLs.
+- **Auth** ([src/lib/auth/server.ts](src/lib/auth/server.ts), [src/proxy.ts](src/proxy.ts), [src/lib/session.ts](src/lib/session.ts))
+  - `createNeonAuth` from `@neon/auth/next/server`; `/api/auth/[...path]` proxies browser calls to Neon Auth.
+  - `proxy.ts` runs `auth.middleware()` on every page: it refreshes the session, finishes the Google sign-in hand-off, and redirects signed-out visitors to `/sign-in`. Public pages are listed in `PUBLIC_ROUTES`.
+  - Email sign-in/up are server actions ([src/app/(auth)/actions.ts](src/app/(auth)/actions.ts)); Google uses `authClient.signIn.social`. Sign-out is a full page load.
+  - Users live in Neon Auth's `neon_auth` schema. `profiles.id` is the Auth user id; the role (client/trainer) is chosen once at `/onboarding`.
+  - Every page and action re-checks the session (`requireClient`, `requireTrainer`); the proxy is a convenience, not the boundary.
+- **Data** ([src/db/schema.ts](src/db/schema.ts), [src/lib/queries.ts](src/lib/queries.ts), [src/lib/actions.ts](src/lib/actions.ts), [src/app/trainer/actions.ts](src/app/trainer/actions.ts))
+  - Money is integer kobo. `bookings.slot_id` is unique, so a slot can't be double-booked; `earnings.booking_id` is unique, so a payment is credited once.
+  - Booking locks the slot row (`SELECT … FOR UPDATE`), rejects paid slots and live 15-minute checkout holds, then records the booking and the trainer's 90% net in one transaction.
+  - Lesson access: the first lesson is free; the rest need a membership with `current_period_end` in the future (cancelled members keep access until then). Trainers see their own lessons.
+- **Realtime** ([src/lib/realtime.ts](src/lib/realtime.ts), [src/components/live-bookings.tsx](src/components/live-bookings.tsx))
+  - The trainer overview runs `liveBookingsQuery(trainerId)` for the first render and seals the same query with `NEON_REALTIME_SECRET`; the browser subscribes with `useLiveQuery`.
+  - Renewals go through `POST /api/trainer/live-bookings`, which re-checks the session and that the page's user is still the signed-in user.
 
 ## 4. Deploy to Cloudways Velocity
 
-1. Push this repo to GitHub.
-2. In Cloudways Velocity, create a Node.js app from the repo. The Next.js preset uses `npm run build` and `npm start`.
-3. Add every variable from `.env.example`, with `NEXT_PUBLIC_APP_URL` set to your production URL. Use the Neon **main** branch connection string.
-4. Run `npm run db:migrate` (and optionally `npm run db:seed`) against production once.
-5. Point the external services at production:
-   - Paystack webhook URL: `https://<domain>/api/webhooks/paystack`
-   - Neon Auth trusted domain, plus the Google OAuth redirect URI for your domain
-   - Neon Realtime allowed origins: add your domain
+1. Create a Node.js app from this repo (Next.js preset: `npm run build`, `npm start`).
+2. Add the variables from `.env.local` (run `neon env pull` for the Neon ones), with `NEXT_PUBLIC_APP_URL` set to your domain and `DEMO_LOGIN=off`.
+3. Run `npm run db:migrate` once against the branch you deploy.
+4. In Neon: add your domain as an Auth trusted domain (`neon neon-auth domain add https://your-domain`), switch Google sign-in to your own OAuth client, and configure custom SMTP for auth emails.
 
 ## 5. Verification checklist
 
-- [ ] Visitor: search and filter trainers, open a program, play lesson 1. Lesson 2 shows the paywall.
-- [ ] Trainer signs up, onboards, creates a program, uploads a cover and a lesson video, publishes, and adds a slot.
-- [ ] Client signs up with Google, subscribes with a Paystack test card, and lesson 2 now plays.
-- [ ] Client messages the trainer, with a thread reply and a reaction.
-- [ ] Client books the slot and pays. The trainer dashboard updates live and shows 90% net.
-- [ ] Resending the same webhook from Paystack creates no duplicate earnings.
-- [ ] Both join the video call inside the join window.
-- [ ] Client cancels the membership: status is non-renewing and access remains.
-- [ ] "Send test error to Sentry" on the trainer overview shows up in Sentry with a Replay.
+- [x] Sign up, onboarding, sign out, sign in, wrong-password message, session survives reload, protected routes redirect.
+- [x] Visitor sees lesson 2 paywalled; after subscribing, lesson 2 plays and "Mark complete" persists.
+- [x] Client books a slot; the trainer dashboard shows it live and earnings show 90% net.
+- [x] Trainer adds a slot and creates a program.
+- [ ] Paystack checkout, webhook replay creates no duplicate earnings.
+- [ ] Stream chat with thread replies and reactions; both sides join the video call in the window.
+- [ ] ImageKit uploads and private lesson playback.
+- [ ] A test error shows up in Sentry with a Replay.

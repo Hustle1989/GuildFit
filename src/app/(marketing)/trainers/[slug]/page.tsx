@@ -3,24 +3,27 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Award, BadgeCheck, Briefcase, MapPin, MessageCircle, Users } from "lucide-react";
-import { BookingCard } from "@/components/booking-card";
+import { BookingSection } from "@/components/booking-card";
 import { ProgramCard } from "@/components/cards";
 import { GOAL_ICONS } from "@/components/shared";
 import { buttonVariants } from "@/components/ui/button";
-import { goalLabel, openSlotsFor, programsByTrainer, trainerBySlug } from "@/lib/mock-data";
+import { getTrainerBySlug, listBookableSlots, listProgramsByTrainer } from "@/lib/queries";
+import { getCurrentUser } from "@/lib/session";
+import { goalLabel } from "@/lib/types";
 import { formatNaira } from "@/lib/utils";
 
 export async function generateMetadata({ params }: PageProps<"/trainers/[slug]">): Promise<Metadata> {
-  const trainer = trainerBySlug((await params).slug);
+  const trainer = await getTrainerBySlug((await params).slug);
   if (!trainer) return {};
   return { title: `${trainer.name}, ${trainer.title} coach`, description: trainer.headline, openGraph: { images: [trainer.image] } };
 }
 
 export default async function TrainerPage({ params }: PageProps<"/trainers/[slug]">) {
-  const trainer = trainerBySlug((await params).slug);
+  const trainer = await getTrainerBySlug((await params).slug);
   if (!trainer) notFound();
-  const programs = programsByTrainer(trainer.id);
-  const slots = openSlotsFor(trainer).map((s) => ({ ...s, startsAt: s.startsAt.toISOString() }));
+  const [programs, upcomingSlots, viewer] = await Promise.all([listProgramsByTrainer(trainer.id), listBookableSlots(trainer.id), getCurrentUser()]);
+  const slots = upcomingSlots.map((s) => ({ ...s, startsAt: s.startsAt.toISOString() }));
+  const viewerState = !viewer ? "anonymous" : viewer.id === trainer.id ? "self" : "member";
   const firstName = trainer.name.split(" ")[0];
 
   return (
@@ -94,20 +97,21 @@ export default async function TrainerPage({ params }: PageProps<"/trainers/[slug
         </div>
       </section>
 
-      <section id="book" className="relative mx-auto grid max-w-7xl scroll-mt-24 gap-10 px-4 pb-16 sm:px-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-        <div>
+      <section id="book" className="relative mx-auto max-w-7xl scroll-mt-24 px-4 pb-14 sm:px-6">
+        <BookingSection slots={slots} viewer={viewerState} trainerName={trainer.name} defaultPriceKobo={trainer.sessionPriceKobo} />
+      </section>
+
+      {programs.length > 0 && (
+        <section className="relative mx-auto max-w-7xl px-4 pb-16 sm:px-6">
           <h2 className="font-display text-3xl">Programs by {firstName}</h2>
           <p className="mt-2 text-muted-foreground">Included with your GuildFit membership.</p>
-          <div className="mt-6 grid gap-5 sm:grid-cols-2">
+          <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {programs.map((p) => (
               <ProgramCard key={p.id} program={p} />
             ))}
           </div>
-        </div>
-        <div className="lg:sticky lg:top-24 lg:self-start">
-          <BookingCard slots={slots} trainerName={trainer.name} />
-        </div>
-      </section>
+        </section>
+      )}
     </div>
   );
 }

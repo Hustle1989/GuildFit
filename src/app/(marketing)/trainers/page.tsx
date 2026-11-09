@@ -4,7 +4,8 @@ import { TrainerCard } from "@/components/cards";
 import { FilterBar } from "@/components/filter-bar";
 import { PageHero } from "@/components/page-hero";
 import { EmptyState } from "@/components/shared";
-import { trainers, type GoalKey } from "@/lib/mock-data";
+import { listTrainers } from "@/lib/queries";
+import { isGoal } from "@/lib/types";
 
 export const metadata: Metadata = {
   title: "Personal trainers",
@@ -12,13 +13,10 @@ export const metadata: Metadata = {
 };
 
 export default async function TrainersPage({ searchParams }: PageProps<"/trainers">) {
-  const { q, goal } = (await searchParams) as { q?: string; goal?: GoalKey };
-  const query = q?.toLowerCase().trim();
-  const results = trainers.filter(
-    (t) =>
-      (!goal || t.goals.includes(goal)) &&
-      (!query || `${t.name} ${t.title} ${t.headline} ${t.location}`.toLowerCase().includes(query)),
-  );
+  const params = await searchParams;
+  const q = typeof params.q === "string" ? params.q.slice(0, 80) : undefined;
+  const goal = isGoal(params.goal) ? params.goal : undefined;
+  const results = await listTrainers({ q, goal });
 
   return (
     <>

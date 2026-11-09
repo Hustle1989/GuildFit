@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, CalendarX } from "lucide-react";
+import { ArrowRight, BadgeCheck, CalendarX, CirclePlay } from "lucide-react";
 import { StatusPill } from "@/components/app-ui";
 import { SessionCard } from "@/components/session-row";
 import { EmptyState } from "@/components/shared";
 import { buttonVariants } from "@/components/ui/button";
-import { currentClient, getMembership, getMyBookings, myPrograms, programById, trainerById } from "@/lib/mock-data";
-import { formatDate, formatNaira, sessionState } from "@/lib/utils";
+import { getLibrary, getMembership, isMembershipActive, listClientSessions } from "@/lib/queries";
+import { requireClient } from "@/lib/session";
+import { formatDate, formatNaira, MEMBERSHIP_PRICE_KOBO, sessionState } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "My Library" };
 
@@ -22,25 +23,25 @@ function SectionTitle({ title, href, linkLabel }: { title: string; href: string;
   );
 }
 
-export default function LibraryPage() {
-  const upcoming = getMyBookings().filter((b) => sessionState(b.startsAt, b.durationMin) !== "ended");
-  const membership = getMembership();
-  const library = myPrograms.map((mp) => ({ ...mp, program: programById(mp.programId)! }));
+export default async function LibraryPage() {
+  const user = await requireClient();
+  const [sessions, membership, library] = await Promise.all([listClientSessions(user.id), getMembership(user.id), getLibrary(user.id)]);
+  const upcoming = sessions.filter((b) => sessionState(b.startsAt, b.durationMin) !== "ended");
+  const member = isMembershipActive(membership);
 
   return (
     <>
       <p className="eyebrow">My Library</p>
-      <h1 className="font-display mt-4 text-4xl sm:text-5xl">Welcome back, {currentClient.name.split(" ")[0]}</h1>
+      <h1 className="font-display mt-4 text-4xl sm:text-5xl">Welcome back, {user.name.split(" ")[0]}</h1>
       <p className="mt-3 text-muted-foreground">Your programs and upcoming sessions, all in one place.</p>
 
       <section className="mt-12">
         <SectionTitle title="Upcoming sessions" href="/sessions" linkLabel="All sessions" />
         {upcoming.length ? (
           <div className="grid gap-4 lg:grid-cols-2">
-            {upcoming.map((b) => {
-              const t = trainerById(b.trainerId)!;
-              return <SessionCard key={b.id} id={b.id} person={t} startsAt={b.startsAt} durationMin={b.durationMin} />;
-            })}
+            {upcoming.map((b) => (
+              <SessionCard key={b.id} id={b.id} person={b.trainer} startsAt={b.startsAt} durationMin={b.durationMin} />
+            ))}
           </div>
         ) : (
           <EmptyState icon={CalendarX} title="No sessions booked" description="Book a 1:1 video call from any coach's profile." />
@@ -49,15 +50,18 @@ export default function LibraryPage() {
 
       <section className="mt-12">
         <SectionTitle title="My programs" href="/programs" linkLabel="Explore programs" />
+        {library.length === 0 && (
+          <EmptyState icon={CirclePlay} title="No programs yet" description="Open any program and start its first lesson. It'll show up here with your progress." />
+        )}
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {library.map(({ program, completed }) => {
-            const trainer = trainerById(program.trainerId);
+            const trainer = program.trainer;
             const next = program.lessons[Math.min(completed, program.lessons.length - 1)];
             const pct = Math.round((completed / program.lessons.length) * 100);
             return (
               <Link
                 key={program.id}
-                href={`/programs/${program.slug}/lessons/${next.id}?view=member`}
+                href={`/programs/${program.slug}/lessons/${next.id}`}
                 className="group relative block aspect-[5/4] overflow-hidden rounded-2xl border border-border bg-card"
               >
                 <Image
@@ -95,17 +99,23 @@ export default function LibraryPage() {
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-semibold">{membership.plan}</p>
-            <StatusPill tone="green" dot>
-              Active
-            </StatusPill>
+            <p className="font-semibold">GuildFit Monthly</p>
+            {member ? (
+              <StatusPill tone="green" dot>
+                {membership!.status === "active" ? "Active" : "Cancelled"}
+              </StatusPill>
+            ) : (
+              <StatusPill tone="muted">Not a member</StatusPill>
+            )}
           </div>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Every program unlocked · {formatNaira(membership.priceKobo)}/month · renews {formatDate(membership.renewsAt, "short")}
+            {member
+              ? `Every program unlocked · ${formatNaira(MEMBERSHIP_PRICE_KOBO)}/month · ${membership!.status === "active" ? "renews" : "access until"} ${formatDate(membership!.currentPeriodEnd, "short")}`
+              : `Unlock every lesson in every program for ${formatNaira(MEMBERSHIP_PRICE_KOBO)}/month.`}
           </p>
         </div>
-        <Link href="/billing" className={buttonVariants({ variant: "outline", className: "h-9 px-4" })}>
-          Manage membership
+        <Link href={member ? "/billing" : "/pricing"} className={buttonVariants({ variant: member ? "outline" : "default", className: "h-9 px-4" })}>
+          {member ? "Manage membership" : "Become a member"}
         </Link>
       </section>
     </>

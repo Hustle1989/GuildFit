@@ -4,18 +4,11 @@
  */
 import { photo } from "@/lib/utils";
 
-// ---------- time helpers (relative to "now", so the demo always looks current) ----------
+// ---------- time helpers (relative to "now", so the demo chat always looks current) ----------
 const MIN = 60_000;
 const DAY = 24 * 60 * MIN;
 const now = () => Date.now();
 const minutesFromNow = (m: number) => new Date(now() + m * MIN);
-/** The demo's "starting soon" session: 5–10 minutes out, on a round 5-minute mark. */
-const soon = () => {
-  const d = minutesFromNow(5);
-  d.setUTCSeconds(0, 0);
-  d.setUTCMinutes(Math.ceil(d.getUTCMinutes() / 5) * 5);
-  return d;
-};
 /** A day offset at a fixed Lagos hour (UTC+1). */
 const dayAt = (days: number, hourLagos: number, minute = 0) => {
   const d = new Date(now() + days * DAY);
@@ -64,24 +57,6 @@ export type Program = {
 
 export type Person = { id: string; name: string; email: string; image: string };
 
-export type Slot = {
-  id: string;
-  trainerId: string;
-  startsAt: Date;
-  durationMin: number;
-  priceKobo: number;
-  status: "open" | "held" | "booked";
-  clientId?: string;
-};
-
-export type Booking = {
-  id: string;
-  trainerId: string;
-  clientId: string;
-  startsAt: Date;
-  durationMin: number;
-  amountKobo: number;
-};
 
 export type Message = {
   id: string;
@@ -93,19 +68,6 @@ export type Message = {
 };
 
 export type Conversation = { id: string; withId: string; unread: number; messages: Message[] };
-
-// ---------- goals (categories) ----------
-export const GOALS: { key: GoalKey; label: string }[] = [
-  { key: "strength", label: "Strength" },
-  { key: "hiit", label: "HIIT" },
-  { key: "cardio", label: "Cardio" },
-  { key: "yoga", label: "Yoga" },
-  { key: "core", label: "Core" },
-  { key: "mobility", label: "Mobility" },
-  { key: "recovery", label: "Recovery" },
-  { key: "home", label: "At Home" },
-];
-export const goalLabel = (key: GoalKey) => GOALS.find((g) => g.key === key)?.label ?? key;
 
 // ---------- trainers ----------
 export const trainers: Trainer[] = [
@@ -437,91 +399,6 @@ export const people: Record<string, { name: string; image: string; role: "traine
   ...getClients().map((c) => [c.id, { name: c.name, image: c.image, role: "client" as const }]),
 ]);
 
-// ---------- client (Ada) data ----------
-export const getMembership = () => ({
-  plan: "GuildFit Monthly",
-  status: "active" as "active" | "non_renewing",
-  priceKobo: 500_000,
-  renewsAt: dayAt(18, 9),
-  memberSince: dayAt(-96, 9),
-  card: { brand: "Visa", last4: "4081", expires: "08/28" },
-});
-
-export const myPrograms = [
-  { programId: "p1", completed: 4 },
-  { programId: "p3", completed: 1 },
-  { programId: "p4", completed: 2 },
-];
-
-export const clientStats = { weeklyGoalPercent: 78, workouts: "4/5", minutes: 186, streakDays: 12, lessonsCompleted: 27 };
-
-export const getMyBookings = (): Booking[] => ([
-  { id: "b1", trainerId: "t1", clientId: "u1", startsAt: soon(), durationMin: 60, amountKobo: 1_500_000 },
-  { id: "b2", trainerId: "t3", clientId: "u1", startsAt: dayAt(2, 7), durationMin: 45, amountKobo: 1_000_000 },
-  { id: "b3", trainerId: "t2", clientId: "u1", startsAt: dayAt(-6, 18), durationMin: 60, amountKobo: 1_200_000 },
-  { id: "b4", trainerId: "t1", clientId: "u1", startsAt: dayAt(-13, 18), durationMin: 60, amountKobo: 1_500_000 },
-]);
-
-export const getInvoices = () => ([
-  { id: "inv_6", date: minutesFromNow(-60 * 2), description: "1:1 session · Amara Okafor", amountKobo: 1_500_000, status: "Paid" },
-  { id: "inv_5", date: dayAt(-12, 9), description: "GuildFit Monthly", amountKobo: 500_000, status: "Paid" },
-  { id: "inv_4", date: dayAt(-14, 9), description: "1:1 session · Amara Okafor", amountKobo: 1_500_000, status: "Paid" },
-  { id: "inv_3", date: dayAt(-42, 9), description: "GuildFit Monthly", amountKobo: 500_000, status: "Paid" },
-  { id: "inv_2", date: dayAt(-72, 9), description: "GuildFit Monthly", amountKobo: 500_000, status: "Paid" },
-  { id: "inv_1", date: dayAt(-96, 9), description: "GuildFit Monthly", amountKobo: 500_000, status: "Paid" },
-]);
-
-// ---------- trainer (Amara) data ----------
-export const getTrainerSlots = (): Slot[] => ([
-  { id: "s1", trainerId: "t1", startsAt: soon(), durationMin: 60, priceKobo: 1_500_000, status: "booked", clientId: "u1" },
-  { id: "s2", trainerId: "t1", startsAt: dayAt(1, 7), durationMin: 60, priceKobo: 1_500_000, status: "open" },
-  { id: "s3", trainerId: "t1", startsAt: dayAt(1, 18), durationMin: 60, priceKobo: 1_500_000, status: "booked", clientId: "u2" },
-  // "held" = someone is in Paystack checkout right now (15-minute hold)
-  { id: "s4", trainerId: "t1", startsAt: dayAt(2, 7), durationMin: 45, priceKobo: 1_200_000, status: "held", clientId: "u3" },
-  { id: "s5", trainerId: "t1", startsAt: dayAt(2, 18), durationMin: 60, priceKobo: 1_500_000, status: "open" },
-  { id: "s6", trainerId: "t1", startsAt: dayAt(3, 9), durationMin: 30, priceKobo: 800_000, status: "open" },
-  { id: "s7", trainerId: "t1", startsAt: dayAt(3, 18), durationMin: 60, priceKobo: 1_500_000, status: "booked", clientId: "u6" },
-  { id: "s8", trainerId: "t1", startsAt: dayAt(4, 7), durationMin: 60, priceKobo: 1_500_000, status: "open" },
-  { id: "s9", trainerId: "t1", startsAt: dayAt(4, 18), durationMin: 60, priceKobo: 1_500_000, status: "open" },
-  { id: "s10", trainerId: "t1", startsAt: dayAt(5, 10), durationMin: 45, priceKobo: 1_200_000, status: "open" },
-]);
-
-/** Open slots shown on public trainer pages (same shape for every trainer in the demo). */
-export function openSlotsFor(trainer: Trainer): Slot[] {
-  return [1, 2, 3, 5].flatMap((day, i) => [
-    { id: `${trainer.id}-d${day}a`, trainerId: trainer.id, startsAt: dayAt(day, 7 + i), durationMin: 60, priceKobo: trainer.sessionPriceKobo, status: "open" as const },
-    { id: `${trainer.id}-d${day}b`, trainerId: trainer.id, startsAt: dayAt(day, 18), durationMin: 45, priceKobo: Math.round(trainer.sessionPriceKobo * 0.8), status: "open" as const },
-  ]);
-}
-
-/** Paid bookings feed for the trainer dashboard (newest first). */
-export const getRecentBookings = () => ([
-  { id: "rb1", clientId: "u1", paidAt: minutesFromNow(-2), startsAt: soon(), durationMin: 60, grossKobo: 1_500_000 },
-  { id: "rb2", clientId: "u2", paidAt: minutesFromNow(-95), startsAt: dayAt(1, 18), durationMin: 60, grossKobo: 1_500_000 },
-  { id: "rb3", clientId: "u5", paidAt: minutesFromNow(-60 * 20), startsAt: dayAt(-1, 7), durationMin: 60, grossKobo: 1_500_000 },
-  { id: "rb4", clientId: "u7", paidAt: minutesFromNow(-60 * 30), startsAt: dayAt(-2, 18), durationMin: 45, grossKobo: 1_200_000 },
-  { id: "rb5", clientId: "u3", paidAt: minutesFromNow(-60 * 52), startsAt: dayAt(-3, 9), durationMin: 30, grossKobo: 800_000 },
-  { id: "rb6", clientId: "u6", paidAt: minutesFromNow(-60 * 75), startsAt: dayAt(-4, 18), durationMin: 60, grossKobo: 1_500_000 },
-]);
-
-/** Net earnings per week for the last 8 weeks (oldest first). */
-export const getWeeklyEarnings = () =>
-  [4_050_000, 5_400_000, 3_780_000, 6_210_000, 5_940_000, 7_020_000, 6_480_000, 8_100_000].map((netKobo, i) => ({
-    weekStart: dayAt(-7 * (7 - i), 9),
-    netKobo,
-  }));
-
-export const getLedger = () => ([
-  ...getRecentBookings().map((b) => ({ id: `e-${b.id}`, date: b.paidAt, clientId: b.clientId, grossKobo: b.grossKobo })),
-  { id: "e7", date: dayAt(-8, 12), clientId: "u2", grossKobo: 1_500_000 },
-  { id: "e8", date: dayAt(-9, 12), clientId: "u1", grossKobo: 1_500_000 },
-  { id: "e9", date: dayAt(-11, 12), clientId: "u7", grossKobo: 1_500_000 },
-  { id: "e10", date: dayAt(-15, 12), clientId: "u5", grossKobo: 1_200_000 },
-].map((row) => {
-  const feeKobo = Math.round(row.grossKobo * 0.1);
-  return { ...row, feeKobo, netKobo: row.grossKobo - feeKobo };
-}));
-
 // ---------- chat ----------
 export const getClientConversations = (): Conversation[] => ([
   {
@@ -617,11 +494,3 @@ export const siteStats = [
   { value: "4.9", label: "Average rating" },
 ];
 
-// ---------- lookups ----------
-export const trainerById = (id: string) => trainers.find((t) => t.id === id);
-export const trainerBySlug = (slug: string) => trainers.find((t) => t.slug === slug);
-export const programBySlug = (slug: string) => programs.find((p) => p.slug === slug);
-export const programById = (id: string) => programs.find((p) => p.id === id);
-export const programsByTrainer = (trainerId: string) => programs.filter((p) => p.trainerId === trainerId && p.published);
-export const publishedPrograms = programs.filter((p) => p.published);
-export const totalMinutes = (p: Program) => p.lessons.reduce((sum, l) => sum + l.durationMin, 0);

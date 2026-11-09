@@ -14,7 +14,7 @@ import {
   Target,
   type LucideIcon,
 } from "lucide-react";
-import type { GoalKey } from "@/lib/mock-data";
+import type { GoalKey } from "@/lib/types";
 import { cn, initials } from "@/lib/utils";
 
 export const GOAL_ICONS: Record<GoalKey, LucideIcon> = {

@@ -17,14 +17,13 @@ import { NewsletterForm } from "@/components/newsletter-form";
 import { ProgressRing } from "@/components/progress-ring";
 import { GOAL_ICONS, IconChip, SectionHeading, Stars, UserAvatar } from "@/components/shared";
 import { buttonVariants } from "@/components/ui/button";
-import { GOALS, programBySlug, siteStats, testimonials, trainers, type Program } from "@/lib/mock-data";
+import { siteStats, testimonials } from "@/lib/mock-data";
+import { listPrograms, listTrainers } from "@/lib/queries";
+import { GOALS } from "@/lib/types";
 import { photo } from "@/lib/utils";
 
-const FEATURED = ["barbell-foundations", "20-minute-hiit-burn", "power-vinyasa-flow", "couch-to-5k"]
-  .map(programBySlug)
-  .filter((p): p is Program => Boolean(p));
-
-export default function HomePage() {
+export default async function HomePage() {
+  const [featured, coaches] = await Promise.all([listPrograms({ limit: 4 }), listTrainers()]);
   return (
     <>
       <Hero />
@@ -37,7 +36,7 @@ export default function HomePage() {
           linkLabel="View all programs"
         />
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {FEATURED.map((program) => (
+          {featured.map((program) => (
             <ProgramFeatureCard key={program.id} program={program} />
           ))}
         </div>
@@ -54,7 +53,7 @@ export default function HomePage() {
           linkLabel="Browse all trainers"
         />
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {trainers.slice(0, 4).map((trainer) => (
+          {coaches.slice(0, 4).map((trainer) => (
             <TrainerCard key={trainer.id} trainer={trainer} />
           ))}
         </div>
