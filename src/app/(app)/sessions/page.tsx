@@ -5,20 +5,21 @@ import { PageHeader } from "@/components/app-ui";
 import { SessionCard } from "@/components/session-row";
 import { EmptyState } from "@/components/shared";
 import { buttonVariants } from "@/components/ui/button";
-import { getMyBookings, trainerById } from "@/lib/mock-data";
+import { listClientSessions } from "@/lib/queries";
+import { requireClient } from "@/lib/session";
 import { sessionState } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "My sessions" };
 
-export default function SessionsPage() {
-  const bookings = getMyBookings();
+export default async function SessionsPage() {
+  const user = await requireClient();
+  const bookings = await listClientSessions(user.id);
   const upcoming = bookings.filter((b) => sessionState(b.startsAt, b.durationMin) !== "ended");
-  const past = bookings.filter((b) => sessionState(b.startsAt, b.durationMin) === "ended");
+  const past = bookings.filter((b) => sessionState(b.startsAt, b.durationMin) === "ended").reverse();
 
-  const card = (b: (typeof bookings)[number]) => {
-    const t = trainerById(b.trainerId)!;
-    return <SessionCard key={b.id} id={b.id} person={t} startsAt={b.startsAt} durationMin={b.durationMin} amountKobo={b.amountKobo} />;
-  };
+  const card = (b: (typeof bookings)[number]) => (
+    <SessionCard key={b.id} id={b.id} person={b.trainer} startsAt={b.startsAt} durationMin={b.durationMin} amountKobo={b.amountKobo} />
+  );
 
   return (
     <>
@@ -39,7 +40,7 @@ export default function SessionsPage() {
 
       <section className="mt-12 space-y-3">
         <h2 className="text-xl font-semibold">Past</h2>
-        {past.map(card)}
+        {past.length ? past.map(card) : <p className="text-sm text-muted-foreground">No past sessions yet.</p>}
       </section>
     </>
   );

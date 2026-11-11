@@ -1,13 +1,23 @@
 import Link from "next/link";
 import { CircleCheck, CircleX } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
-import { formatNaira } from "@/lib/utils";
+import { getMembership, getSessionForUser } from "@/lib/queries";
+import { homeFor, requireUser } from "@/lib/session";
+import { formatDate, formatNaira, MEMBERSHIP_PRICE_KOBO } from "@/lib/utils";
 
-/** Where Paystack sends people back after checkout. Demo: ?type=membership|session, ?status=failed. */
+/**
+ * Where checkout returns people. Paystack's callback will verify the reference
+ * here; for now the server action already recorded the payment, so this page
+ * reads the booking or membership back from Postgres.
+ */
 export default async function PaymentCallbackPage({ searchParams }: PageProps<"/payments/callback">) {
-  const { type, status, trainer } = (await searchParams) as { type?: string; status?: string; trainer?: string };
-  const ok = status !== "failed";
-  const isSession = type === "session";
+  const user = await requireUser();
+  const params = await searchParams;
+  const isSession = params.type === "session";
+  const session = isSession && typeof params.booking === "string" ? await getSessionForUser(params.booking, user.id) : null;
+  const membership = isSession ? null : await getMembership(user.id);
+  const ok = params.status !== "failed" && (isSession ? !!session : !!membership);
+  const trainer = session?.trainer.name;
 
   return (
     <div className="relative overflow-hidden">
@@ -29,9 +39,15 @@ export default async function PaymentCallbackPage({ searchParams }: PageProps<"/
 
         {ok && (
           <div className="mt-8 rounded-2xl border border-border bg-card p-5 text-left text-sm">
-            <div className="flex justify-between py-1.5"><span className="text-muted-foreground">Item</span><span>{isSession ? "1:1 video session" : "GuildFit Monthly"}</span></div>
-            <div className="flex justify-between py-1.5"><span className="text-muted-foreground">Amount</span><span className="font-semibold">{formatNaira(isSession ? 1_500_000 : 500_000)}</span></div>
-            <div className="flex justify-between py-1.5"><span className="text-muted-foreground">Reference</span><span className="font-mono text-xs">gf_8f2c91d4</span></div>
+            <div className="flex justify-between py-1.5"><span className="text-muted-foreground">Item</span><span>{session ? `1:1 with ${trainer}` : "GuildFit Monthly"}</span></div>
+            {session && (
+              <div className="flex justify-between py-1.5"><span className="text-muted-foreground">When</span><span>{formatDate(session.startsAt)} · {session.durationMin} min</span></div>
+            )}
+            {membership && (
+              <div className="flex justify-between py-1.5"><span className="text-muted-foreground">Renews</span><span>{formatDate(membership.currentPeriodEnd, "date")}</span></div>
+            )}
+            <div className="flex justify-between py-1.5"><span className="text-muted-foreground">Amount</span><span className="font-semibold">{formatNaira(session ? session.amountKobo : MEMBERSHIP_PRICE_KOBO)}</span></div>
+            <div className="flex justify-between py-1.5"><span className="text-muted-foreground">Reference</span><span className="font-mono text-xs">{session ? session.reference.slice(0, 15) : `gf_m_${user.id.slice(0, 8)}`}</span></div>
           </div>
         )}
 
@@ -41,7 +57,9 @@ export default async function PaymentCallbackPage({ searchParams }: PageProps<"/
               <Link href={isSession ? "/sessions" : "/programs"} className={buttonVariants({ size: "lg", className: "h-11 px-6 font-semibold" })}>
                 {isSession ? "View my sessions" : "Start a program"}
               </Link>
-              <Link href="/dashboard" className={buttonVariants({ size: "lg", variant: "outline", className: "h-11 px-6" })}>Dashboard</Link>
+              <Link href={homeFor(user.role)} className={buttonVariants({ size: "lg", variant: "outline", className: "h-11 px-6" })}>
+                {user.role === "trainer" ? "Studio" : "My Library"}
+              </Link>
             </>
           ) : (
             <Link href="/pricing" className={buttonVariants({ size: "lg", className: "h-11 px-6" })}>Try again</Link>

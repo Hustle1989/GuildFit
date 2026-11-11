@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { GOAL_ICONS } from "@/components/shared";
-import { GOALS, type GoalKey } from "@/lib/mock-data";
+import { GOALS, type GoalKey } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /** URL-driven search + filter chips. A plain GET form, so it works without JS. */

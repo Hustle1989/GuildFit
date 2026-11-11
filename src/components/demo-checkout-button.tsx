@@ -1,28 +1,27 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
-/** Stands in for "redirect to Paystack checkout" during the UI-only phase. */
-export function DemoCheckoutButton({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) {
-  const router = useRouter();
-  const [pending, setPending] = useState(false);
+/**
+ * Submits a server action that completes checkout. Paystack isn't wired yet,
+ * so the action records the payment directly (test mode, nothing is charged).
+ */
+export function CheckoutButton({ action, children, className }: { action: () => Promise<void>; children: React.ReactNode; className?: string }) {
   return (
-    <Button
-      size="lg"
-      className={className}
-      disabled={pending}
-      onClick={() => {
-        setPending(true);
-        toast.loading("Redirecting to Paystack… (demo)", { duration: 1200 });
-        setTimeout(() => router.push(href), 900);
-      }}
-    >
+    <form action={action}>
+      <Submit className={className}>{children}</Submit>
+    </form>
+  );
+}
+
+function Submit({ children, className }: { children: React.ReactNode; className?: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" size="lg" className={className} disabled={pending}>
       {pending && <Loader2 className="animate-spin" />}
-      {children}
+      {pending ? "Processing payment…" : children}
     </Button>
   );
 }

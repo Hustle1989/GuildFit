@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowRight, CirclePlay, Clock, Lock, MapPin, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { GOAL_ICONS, UserAvatar } from "@/components/shared";
-import { goalLabel, totalMinutes, trainerById, type Program, type Trainer } from "@/lib/mock-data";
+import { goalLabel, totalMinutes, type Program, type Trainer } from "@/lib/types";
 import { cn, formatNaira } from "@/lib/utils";
 
 /** Landing-page feature card: copy on the left, photo fading in from the right. */
@@ -36,7 +36,7 @@ export function ProgramFeatureCard({ program }: { program: Program }) {
 
 /** Catalog card used on /programs and trainer pages. */
 export function ProgramCard({ program, className }: { program: Program; className?: string }) {
-  const trainer = trainerById(program.trainerId);
+  const trainer = program.trainer;
   return (
     <Link
       href={`/programs/${program.slug}`}

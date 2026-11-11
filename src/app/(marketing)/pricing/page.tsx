@@ -1,16 +1,20 @@
 import type { Metadata } from "next";
 import { Check, ChevronDown, Minus, ShieldCheck } from "lucide-react";
-import { DemoCheckoutButton } from "@/components/demo-checkout-button";
-import { formatNaira, MEMBERSHIP_PRICE_KOBO } from "@/lib/utils";
-import { publishedPrograms, trainers } from "@/lib/mock-data";
+import Link from "next/link";
+import { CheckoutButton } from "@/components/demo-checkout-button";
+import { buttonVariants } from "@/components/ui/button";
+import { subscribeMembership } from "@/lib/actions";
+import { getMembership, isMembershipActive, listPrograms, listTrainers } from "@/lib/queries";
+import { getCurrentUser } from "@/lib/session";
+import { formatDate, formatNaira, MEMBERSHIP_PRICE_KOBO } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Membership pricing",
   description: "One GuildFit membership unlocks every workout program from every trainer.",
 };
 
-const PERKS = [
-  `All ${publishedPrograms.length} programs from ${trainers.length} coaches`,
+const perks = (programCount: number, coachCount: number) => [
+  `All ${programCount} programs from ${coachCount} coaches`,
   "New programs as soon as they're published",
   "Track progress lesson by lesson",
   "Message any coach, anytime",
@@ -34,7 +38,12 @@ const FAQ = [
   ["Can I switch coaches?", "Yes. Your membership covers every program from every coach on GuildFit."],
 ];
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const [user, allPrograms, coaches] = await Promise.all([getCurrentUser(), listPrograms(), listTrainers()]);
+  const membership = user ? await getMembership(user.id) : null;
+  const member = isMembershipActive(membership);
+  const PERKS = perks(allPrograms.length, coaches.length);
+
   return (
     <div className="relative overflow-hidden">
       <div className="pointer-events-none absolute -top-40 left-1/2 size-[640px] -translate-x-1/2 rounded-full bg-primary/10 blur-[150px]" />
@@ -59,12 +68,34 @@ export default function PricingPage() {
             {formatNaira(MEMBERSHIP_PRICE_KOBO)}
           </p>
           <p className="text-muted-foreground">per month · billed monthly</p>
-          <DemoCheckoutButton href="/payments/callback?type=membership" className="glow mt-8 h-12 w-full text-base font-semibold">
-            Subscribe with Paystack
-          </DemoCheckoutButton>
-          <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-            <ShieldCheck className="size-3.5" /> Secure checkout · Cancel anytime
-          </p>
+          {member ? (
+            <>
+              <Link href="/billing" className={buttonVariants({ size: "lg", variant: "outline", className: "mt-8 h-12 w-full text-base font-semibold" })}>
+                Manage membership
+              </Link>
+              <p className="mt-3 text-center text-xs text-muted-foreground">
+                You&apos;re a member · {membership!.status === "active" ? "renews" : "access until"} {formatDate(membership!.currentPeriodEnd, "date")}
+              </p>
+            </>
+          ) : user ? (
+            <>
+              <CheckoutButton action={subscribeMembership} className="glow mt-8 h-12 w-full text-base font-semibold">
+                Subscribe with Paystack
+              </CheckoutButton>
+              <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                <ShieldCheck className="size-3.5" /> Test mode: no card is charged yet · Cancel anytime
+              </p>
+            </>
+          ) : (
+            <>
+              <Link href="/sign-up" className={buttonVariants({ size: "lg", className: "glow mt-8 h-12 w-full text-base font-semibold" })}>
+                Create an account to subscribe
+              </Link>
+              <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                <ShieldCheck className="size-3.5" /> Secure checkout · Cancel anytime
+              </p>
+            </>
+          )}
         </div>
 
         <div className="rounded-3xl border border-border bg-card/60 p-8">

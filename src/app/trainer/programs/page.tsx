@@ -4,12 +4,15 @@ import Link from "next/link";
 import { CirclePlay, Plus, Users } from "lucide-react";
 import { PageHeader } from "@/components/app-ui";
 import { buttonVariants } from "@/components/ui/button";
-import { currentTrainer, goalLabel, programs, totalMinutes } from "@/lib/mock-data";
+import { listProgramsByTrainer } from "@/lib/queries";
+import { requireTrainer } from "@/lib/session";
+import { goalLabel, totalMinutes } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Your programs" };
 
-export default function TrainerProgramsPage() {
-  const mine = programs.filter((p) => p.trainerId === currentTrainer.id);
+export default async function TrainerProgramsPage() {
+  const user = await requireTrainer();
+  const mine = await listProgramsByTrainer(user.id, { includeDrafts: true });
 
   return (
     <>

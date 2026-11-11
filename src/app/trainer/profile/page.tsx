@@ -3,14 +3,18 @@ import Image from "next/image";
 import Link from "next/link";
 import { MapPin, Users } from "lucide-react";
 import { PageHeader } from "@/components/app-ui";
-import { currentTrainer } from "@/lib/mock-data";
+import { notFound } from "next/navigation";
+import { getTrainerById } from "@/lib/queries";
+import { requireTrainer } from "@/lib/session";
 import { formatNaira } from "@/lib/utils";
 import { ProfileForm } from "./profile-form";
 
 export const metadata: Metadata = { title: "Profile" };
 
-export default function TrainerProfilePage() {
-  const t = currentTrainer;
+export default async function TrainerProfilePage() {
+  const user = await requireTrainer();
+  const t = await getTrainerById(user.id);
+  if (!t) notFound();
   return (
     <>
       <PageHeader title="Public profile" subtitle="How clients see you on GuildFit." />

@@ -47,6 +47,19 @@ export function greeting() {
   return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 }
 
+/** "Amara Okafor!" -> "amara-okafor" */
+export function slugify(text: string) {
+  return (
+    text
+      .normalize("NFKD")
+      .replace(/\p{M}/gu, "") // strip accents
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "item"
+  );
+}
+
 export function initials(name: string) {
   return name
     .split(" ")
@@ -86,6 +99,11 @@ export function relativeStart(startsAt: Date, durationMin = 60) {
   if (mins < 24 * 60) return `In ${Math.round(mins / 60)} h`;
   const days = Math.round(mins / (24 * 60));
   return days === 1 ? "Tomorrow" : `In ${days} days`;
+}
+
+/** True when `date` falls within the last `days` days. */
+export function isWithinDays(date: Date, days: number) {
+  return date.getTime() > Date.now() - days * 24 * 60 * 60_000;
 }
 
 /** "2 min ago", "3 h ago", "Yesterday"… */

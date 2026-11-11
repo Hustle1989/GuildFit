@@ -1,59 +1,69 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ArrowRight, Dumbbell, Loader2, User } from "lucide-react";
+import { useFormStatus } from "react-dom";
+import { ArrowRight, CircleAlert, Dumbbell, Loader2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { authClient } from "@/lib/auth/client";
+import { demoSignInAction, signInAction, signUpAction, type AuthFormState } from "./actions";
 
-/** UI-only: submitting just navigates. Neon Auth gets wired in later. */
-export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
-  const router = useRouter();
-  const [pending, setPending] = useState(false);
+export function AuthForm({ mode, demoLogin, notice }: { mode: "sign-in" | "sign-up"; demoLogin: boolean; notice?: string }) {
   const isSignUp = mode === "sign-up";
-  const go = (href: string) => {
-    setPending(true);
-    setTimeout(() => router.push(href), 500);
-  };
+  const [state, formAction, pending] = useActionState<AuthFormState, FormData>(isSignUp ? signUpAction : signInAction, {});
+  const [google, setGoogle] = useState<"idle" | "pending" | string>("idle");
+  const error = state.error ?? (google !== "idle" && google !== "pending" ? google : notice);
+
+  async function continueWithGoogle() {
+    setGoogle("pending");
+    // Neon Auth sends the user to Google, then back here; proxy.ts finishes the hand-off.
+    const { error } = await authClient.signIn.social({ provider: "google", callbackURL: `${window.location.origin}/onboarding` });
+    if (error) setGoogle(error.message ?? "Google sign-in failed. Try again.");
+  }
 
   return (
     <div className="w-full max-w-sm">
       <h1 className="font-display text-4xl">{isSignUp ? "Create your account" : "Welcome back"}</h1>
       <p className="mt-2 text-muted-foreground">{isSignUp ? "Clients and coaches start here." : "Sign in to keep training."}</p>
 
-      <Button variant="outline" className="mt-8 h-11 w-full text-sm" onClick={() => go(isSignUp ? "/onboarding" : "/dashboard")}>
-        <GoogleMark /> Continue with Google
+      <Button variant="outline" className="mt-8 h-11 w-full text-sm" onClick={continueWithGoogle} disabled={google === "pending"}>
+        {google === "pending" ? <Loader2 className="animate-spin" /> : <GoogleMark />} Continue with Google
       </Button>
 
       <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
         <span className="h-px flex-1 bg-foreground/10" /> or with email <span className="h-px flex-1 bg-foreground/10" />
       </div>
 
-      <form
-        className="space-y-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          go(isSignUp ? "/onboarding" : "/dashboard");
-        }}
-      >
+      <form action={formAction} className="space-y-4" noValidate>
+        {error && (
+          <p role="alert" className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
+            <CircleAlert className="mt-0.5 size-4 shrink-0" /> {error}
+          </p>
+        )}
         {isSignUp && (
           <div className="space-y-1.5">
             <Label htmlFor="name">Full name</Label>
-            <Input id="name" name="name" required className="h-11" placeholder="Ada Okonkwo" />
+            <Input id="name" name="name" autoComplete="name" required defaultValue={state.name} className="h-11" placeholder="Ada Okonkwo" />
           </div>
         )}
         <div className="space-y-1.5">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" required className="h-11" placeholder="you@example.com" />
+          <Input id="email" name="email" type="email" autoComplete="email" required defaultValue={state.email} className="h-11" placeholder="you@example.com" />
         </div>
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
-            {!isSignUp && <a href="#" className="text-xs text-primary hover:underline">Forgot password?</a>}
-          </div>
-          <Input id="password" name="password" type="password" required minLength={8} className="h-11" placeholder="At least 8 characters" />
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete={isSignUp ? "new-password" : "current-password"}
+            required
+            minLength={isSignUp ? 8 : undefined}
+            className="h-11"
+            placeholder={isSignUp ? "At least 8 characters" : "Your password"}
+          />
         </div>
         <Button type="submit" className="h-11 w-full text-sm font-semibold" disabled={pending}>
           {pending && <Loader2 className="animate-spin" />}
@@ -68,20 +78,38 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         </Link>
       </p>
 
-      {!isSignUp && (
+      {!isSignUp && demoLogin && (
         <div className="mt-8 rounded-xl border border-dashed border-foreground/15 p-4">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Demo shortcuts</p>
+          <p className="mt-1 text-xs text-muted-foreground">Sign in as a seeded account.</p>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <Button variant="secondary" className="h-10 justify-between" onClick={() => go("/dashboard")}>
-              <span className="flex items-center gap-2"><User /> Client</span> <ArrowRight />
-            </Button>
-            <Button variant="secondary" className="h-10 justify-between" onClick={() => go("/trainer")}>
-              <span className="flex items-center gap-2"><Dumbbell /> Trainer</span> <ArrowRight />
-            </Button>
+            <DemoButton role="client" icon={<User />} label="Client" />
+            <DemoButton role="trainer" icon={<Dumbbell />} label="Trainer" />
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+function DemoButton({ role, icon, label }: { role: "client" | "trainer"; icon: React.ReactNode; label: string }) {
+  return (
+    <form action={demoSignInAction}>
+      <input type="hidden" name="role" value={role} />
+      <DemoSubmit icon={icon} label={label} />
+    </form>
+  );
+}
+
+function DemoSubmit({ icon, label }: { icon: React.ReactNode; label: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" variant="secondary" className="h-10 w-full justify-between" disabled={pending}>
+      <span className="flex items-center gap-2">
+        {pending ? <Loader2 className="animate-spin" /> : icon} {label}
+      </span>
+      <ArrowRight />
+    </Button>
   );
 }
 

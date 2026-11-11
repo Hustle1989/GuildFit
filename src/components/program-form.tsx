@@ -12,7 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { dropzoneClass, ProgressBar, Uploader } from "@/components/uploader";
-import { GOALS, type Program } from "@/lib/mock-data";
+import { saveProgram } from "@/app/trainer/actions";
+import { GOALS, type GoalKey, type Level, type Program } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type DraftLesson = { id: string; title: string; durationMin: number; progress: number | null };
@@ -81,14 +82,29 @@ export function ProgramForm({ program }: { program?: Program }) {
 
   return (
     <form
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
+        if (lessons.some((l) => l.progress !== null)) return toast.error("Wait for the uploads to finish.");
+        const data = new FormData(e.currentTarget);
+        setPending(true);
+        const result = await saveProgram({
+          id: program?.id,
+          title: String(data.get("title") ?? ""),
+          description: String(data.get("description") ?? ""),
+          goal: String(data.get("goal")) as GoalKey,
+          level: String(data.get("level")) as Level,
+          weeks: Number(data.get("weeks")),
+          published,
+          lessons: lessons.map(({ id, title, durationMin }) => ({ id, title, durationMin })),
+        });
+        setPending(false);
+        if (!result.ok) return toast.error(result.error);
         if (isNew) {
-          setPending(true);
-          toast.success(published ? "Program created and published (demo)" : "Program created as a draft (demo)");
-          setTimeout(() => router.push("/trainer/programs/p9"), 600);
+          toast.success(published ? "Program created and published" : "Program saved as a draft");
+          router.push(`/trainer/programs/${result.id}`);
         } else {
           toast.success("Changes saved");
+          router.refresh();
         }
       }}
     >
@@ -297,7 +313,9 @@ export function ProgramForm({ program }: { program?: Program }) {
                 <Label htmlFor="published" className="font-medium">
                   Published
                 </Label>
-                <p className="mt-0.5 text-xs text-muted-foreground">Visible on your profile and the directory</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Visible on your profile and the directory{published !== (program?.published ?? false) ? " (save to apply)" : ""}
+                </p>
               </div>
               <Switch
                 id="published"
@@ -305,7 +323,6 @@ export function ProgramForm({ program }: { program?: Program }) {
                 onCheckedChange={(on) => {
                   if (on && ready === 0) return toast.error("Upload at least one lesson before publishing.");
                   setPublished(on);
-                  if (!isNew) toast.success(on ? "Your program is live" : "Program unpublished");
                 }}
               />
             </div>

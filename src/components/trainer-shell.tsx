@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -18,7 +17,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/site/logo";
+import { UserAvatar } from "@/components/shared";
 import { ThemeToggle } from "@/components/theme";
+import { SignOutButton } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
 
 type NavItem = { href: string; label: string; icon: LucideIcon; exact?: boolean };
@@ -38,7 +39,7 @@ export function TrainerShell({
   publicHref,
   children,
 }: {
-  user: { name: string; image: string };
+  user: { name: string; image: string | null };
   publicHref: string;
   children: React.ReactNode;
 }) {
@@ -84,15 +85,17 @@ export function TrainerShell({
         </Link>
       </nav>
 
-      <div className="mt-auto flex items-center gap-3 rounded-xl border border-border bg-card/60 p-2.5">
-        <span className="relative size-9 shrink-0 overflow-hidden rounded-full border border-border">
-          <Image src={user.image} alt="" fill sizes="72px" className="object-cover" />
-        </span>
-        <div className="min-w-0 flex-1">
+      <div className="mt-auto flex items-center gap-2 rounded-xl border border-border bg-card/60 p-2.5">
+        <UserAvatar src={user.image} name={user.name} size={36} className="border border-border" />
+        <div className="min-w-0 flex-1 pl-1">
           <p className="truncate text-sm font-medium">{user.name}</p>
           <p className="text-xs text-muted-foreground">Trainer</p>
         </div>
         <ThemeToggle className="size-8" />
+        <SignOutButton
+          label={false}
+          className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-foreground/5 hover:text-destructive"
+        />
       </div>
     </div>
   );

@@ -7,21 +7,28 @@ import { LessonRow } from "@/components/cards";
 import { GOAL_ICONS, UserAvatar } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { goalLabel, programBySlug, totalMinutes, trainerById } from "@/lib/mock-data";
+import { getCompletedLessonIds, getMembership, getProgramBySlug, isMembershipActive } from "@/lib/queries";
+import { getCurrentUser } from "@/lib/session";
+import { goalLabel, totalMinutes } from "@/lib/types";
 import { formatNaira, MEMBERSHIP_PRICE_KOBO } from "@/lib/utils";
 
 export async function generateMetadata({ params }: PageProps<"/programs/[slug]">): Promise<Metadata> {
-  const program = programBySlug((await params).slug);
-  if (!program) return {};
+  const program = await getProgramBySlug((await params).slug);
+  if (!program?.published) return {};
   return { title: program.title, description: program.description, openGraph: { images: [program.image] } };
 }
 
 export default async function ProgramPage({ params }: PageProps<"/programs/[slug]">) {
-  const program = programBySlug((await params).slug);
-  if (!program) notFound();
-  const trainer = trainerById(program.trainerId);
+  const program = await getProgramBySlug((await params).slug);
+  const viewer = await getCurrentUser();
+  const isOwner = !!program && viewer?.id === program.trainerId;
+  if (!program || (!program.published && !isOwner)) notFound(); // drafts: owner only
+  const trainer = program.trainer;
+  const [membership, done] = viewer ? await Promise.all([getMembership(viewer.id), getCompletedLessonIds(viewer.id, program.id)]) : [null, new Set<string>()];
+  const unlocked = isOwner || isMembershipActive(membership);
   const Icon = GOAL_ICONS[program.goal];
   const first = program.lessons[0];
+  const nextLesson = (unlocked && program.lessons.find((l) => !done.has(l.id))) || first;
 
   return (
     <>
@@ -79,7 +86,7 @@ export default async function ProgramPage({ params }: PageProps<"/programs/[slug
           <div>
             <div className="flex items-end justify-between">
               <h2 className="text-2xl font-bold">Lessons</h2>
-              <p className="text-sm text-muted-foreground">First lesson free</p>
+              <p className="text-sm text-muted-foreground">{unlocked ? `${done.size} of ${program.lessons.length} done` : "First lesson free"}</p>
             </div>
             <ol className="mt-4 divide-y divide-border/60 overflow-hidden rounded-2xl border border-border bg-card">
               {program.lessons.map((lesson, i) => (
@@ -89,8 +96,9 @@ export default async function ProgramPage({ params }: PageProps<"/programs/[slug
                     index={i + 1}
                     title={lesson.title}
                     durationMin={lesson.durationMin}
-                    free={i === 0}
-                    locked={i > 0}
+                    free={i === 0 && !unlocked}
+                    locked={i > 0 && !unlocked}
+                    done={done.has(lesson.id)}
                   />
                 </li>
               ))}
@@ -100,21 +108,26 @@ export default async function ProgramPage({ params }: PageProps<"/programs/[slug
 
         <aside className="lg:sticky lg:top-24 lg:self-start">
           <div className="glow rounded-2xl border border-primary/30 bg-card p-6">
-            <p className="text-sm text-muted-foreground">Included with</p>
+            <p className="text-sm text-muted-foreground">{unlocked ? "Unlocked with your" : "Included with"}</p>
             <p className="text-xl font-bold">GuildFit Membership</p>
             <p className="mt-3 text-4xl font-bold">
               {formatNaira(MEMBERSHIP_PRICE_KOBO)}
               <span className="text-base font-medium text-muted-foreground"> / month</span>
             </p>
             <div className="mt-6 space-y-3">
-              {first && (
-                <Link href={`/programs/${program.slug}/lessons/${first.id}`} className={buttonVariants({ size: "lg", className: "h-12 w-full text-base font-semibold" })}>
-                  <CirclePlay /> Watch free preview
+              {nextLesson && (
+                <Link
+                  href={`/programs/${program.slug}/lessons/${nextLesson.id}`}
+                  className={buttonVariants({ size: "lg", className: "h-12 w-full text-base font-semibold" })}
+                >
+                  <CirclePlay /> {unlocked ? (done.size ? "Continue training" : "Start program") : "Watch free preview"}
                 </Link>
               )}
-              <Link href="/pricing" className={buttonVariants({ size: "lg", variant: "outline", className: "h-12 w-full text-base" })}>
-                Unlock every lesson
-              </Link>
+              {!unlocked && (
+                <Link href="/pricing" className={buttonVariants({ size: "lg", variant: "outline", className: "h-12 w-full text-base" })}>
+                  Unlock every lesson
+                </Link>
+              )}
             </div>
             <ul className="mt-6 space-y-3 border-t border-border pt-6 text-sm">
               {[

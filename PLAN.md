@@ -249,7 +249,7 @@ Differences from the plan above, decided during the build:
 - **Auth UI is custom forms** using `authClient` from `@neondatabase/auth/next`, not the Neon Auth UI kit.
 - **Stream Chat v14** renamed `MessageInput` to `MessageComposer`.
 
-## UI-only phase (current)
+## UI-only phase
 At the user's request, the app was rebuilt as UI only, with hardcoded data and no auth, database or payment calls. The visual direction follows the user's reference screenshots: near-black green-tinted surfaces, a mint accent, bold Outfit headlines, a Caveat script accent, photo-led cards, round icon chips, initials avatars for clients and a fixed trainer sidebar.
 - **Themes:** dark (default) and light. Tokens are in `globals.css` (`:root` = light, `.dark` = dark). An inline script in the root layout applies the saved choice before paint, and `ThemeToggle` (`src/components/theme.tsx`) switches it. Surfaces that sit on photos or video (sign-in photo panel, call stage, video player) force the dark tokens with a `dark` class. `?theme=light|dark` forces a theme for demos.
 - **Routes:**
@@ -262,3 +262,18 @@ At the user's request, the app was rebuilt as UI only, with hardcoded data and n
 - **Simulated in the browser:** uploads (local preview + fake progress), Paystack checkout (redirects to `/payments/callback`), Stream chat (local state with reactions and threads), the video call (lobby, call, ended), and the Neon Realtime feed (a fake booking arrives after 6 s).
 - **Removed for this phase:** `proxy.ts`, API routes, server actions and the `lib/*` integration modules. They are recoverable from commit `22404bd`.
 - **Earnings chart:** wide columns to match the reference: past weeks in muted green (`--chart-1`), the current week in the accent, the value labelled on the latest (or hovered/focused) column. Each column is a focusable button with an accessible label.
+
+## Neon phase (current)
+Neon is wired in for real. Paystack, Stream, ImageKit and Sentry are still simulated.
+- **Provisioning:** `neon init` linked project `dark-cloud-93391236`, branch `production` (aws-us-east-2), and wrote `neon.ts`. `neon deploy` provisioned the services and pulled their env into `.env.local`. The init command also declared Functions (a sample `hello`), Object Storage and the AI Gateway; the app doesn't use them (ImageKit handles media, and there are no AI features).
+- **Database:** Drizzle over `pg` with the pooled `DATABASE_URL` for a long-lived Node server. Migrations use `DATABASE_URL_UNPOOLED`. The schema gained the fields the UI shows: trainer title, location, price and certifications; program tagline, goal, weeks and outcomes.
+- **Auth:** `@neon/auth` (replaces the old `@neondatabase/auth` beta).
+  - `proxy.ts` runs `auth.middleware()` with a catch-all matcher plus `PUBLIC_ROUTES`.
+  - Email sign-in/up are server actions; Google sign-in uses Neon's shared development credentials.
+  - Email verification is off on the branch.
+- **Seed:** `npm run db:seed` creates 13 real Auth accounts through the sign-up API, then programs, slots, 8 weeks of earnings and a membership. It's idempotent, scoped to the demo accounts.
+- **Realtime:** the trainer overview's live bookings feed is a sealed Drizzle query (snake_case keys matching column names), renewed through `POST /api/trainer/live-bookings`.
+- **Simulated payments:** `bookSlot` and `subscribeMembership` record exactly the rows the Paystack callback and webhook will write later.
+- **Times:** everything is shown and entered in Lagos time (WAT, UTC+1).
+- **Verified:** a 17-step headless-browser run covers sign-up through a live booking on the trainer dashboard. The rows were checked in Postgres, then the test data was removed.
+

@@ -1,34 +1,25 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Check, Dumbbell, Loader2, User } from "lucide-react";
+import { useActionState, useState } from "react";
+import { Check, CircleAlert, Dumbbell, Loader2, User } from "lucide-react";
 import { TrainerFields } from "@/components/trainer-fields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Uploader } from "@/components/uploader";
 import { cn } from "@/lib/utils";
+import { completeOnboarding, type OnboardingState } from "./actions";
 
 const ROLES = [
   { value: "client", icon: User, title: "I want to train", text: "Follow programs, chat with coaches and book 1:1 sessions." },
   { value: "trainer", icon: Dumbbell, title: "I'm a coach", text: "Publish programs, take paid bookings and coach clients." },
 ] as const;
 
-export function OnboardingForm() {
-  const router = useRouter();
+export function OnboardingForm({ defaultName }: { defaultName: string }) {
   const [role, setRole] = useState<"client" | "trainer">("client");
-  const [pending, setPending] = useState(false);
+  const [state, formAction, pending] = useActionState<OnboardingState, FormData>(completeOnboarding, {});
 
   return (
-    <form
-      className="mt-10 space-y-8"
-      onSubmit={(e) => {
-        e.preventDefault();
-        setPending(true);
-        setTimeout(() => router.push(role === "trainer" ? "/trainer" : "/dashboard"), 600);
-      }}
-    >
+    <form action={formAction} className="mt-10 space-y-8">
       <div className="grid gap-4 sm:grid-cols-2">
         {ROLES.map(({ value, icon: Icon, title, text }) => (
           <label
@@ -56,11 +47,16 @@ export function OnboardingForm() {
       <div className="space-y-6 rounded-2xl border border-border bg-card p-6">
         <div className="space-y-1.5">
           <Label htmlFor="name">Display name</Label>
-          <Input id="name" defaultValue="Ada Okonkwo" required className="h-11" />
+          <Input id="name" name="name" defaultValue={defaultName} required maxLength={80} className="h-11" />
         </div>
-        <Uploader kind="image" label="Profile photo (optional)" compact />
         {role === "trainer" && <TrainerFields />}
       </div>
+
+      {state.error && (
+        <p role="alert" className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
+          <CircleAlert className="mt-0.5 size-4 shrink-0" /> {state.error}
+        </p>
+      )}
 
       <Button type="submit" size="lg" className="glow h-12 w-full text-base font-semibold" disabled={pending}>
         {pending && <Loader2 className="animate-spin" />}
