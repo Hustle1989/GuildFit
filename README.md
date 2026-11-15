@@ -45,6 +45,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 npm install
 npm run db:migrate    # apply drizzle/ migrations (uses DATABASE_URL_UNPOOLED)
 npm run db:seed       # demo accounts + data; safe to re-run (refreshes demo-owned rows)
+npm run db:slots      # tops up 2 weeks of open 1:1 times for the demo trainers; deletes nothing
 npm run dev
 ```
 

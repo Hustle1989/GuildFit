@@ -22,6 +22,8 @@ import { inArray, sql } from "drizzle-orm";
 import { Pool } from "pg";
 import * as schema from "../src/db/schema";
 import { getClients, programs as seedPrograms, trainers as seedTrainers } from "../src/lib/mock-data";
+import { pgConnectionString } from "../src/db/url";
+import { openSlotPlan, overlaps } from "./slot-plan";
 
 config({ path: ".env.local" });
 
@@ -32,7 +34,7 @@ const AUTH_URL = process.env.NEON_AUTH_BASE_URL;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 if (!process.env.DATABASE_URL || !AUTH_URL) throw new Error("Run `neon env pull` first: DATABASE_URL and NEON_AUTH_BASE_URL are required.");
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL });
+const pool = new Pool({ connectionString: pgConnectionString(process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL) });
 const db = drizzle(pool, { schema });
 
 // ---------- time helpers ----------
@@ -216,12 +218,14 @@ async function main() {
   // Ada's past sessions with Tunde
   slotSeeds.push({ trainer: "t2", startsAt: dayAt(-6, 18), durationMin: 60, priceKobo: 1_200_000, booking: { client: "u1", status: "paid", at: dayAt(-8, 12) } });
 
-  // Open slots for every other trainer over the next week
-  for (const t of seedTrainers.filter((t) => t.id !== amara)) {
-    [1, 2, 3, 5].forEach((day, i) => {
-      slotSeeds.push({ trainer: t.id, startsAt: dayAt(day, 7 + i), durationMin: 60, priceKobo: t.sessionPriceKobo });
-      slotSeeds.push({ trainer: t.id, startsAt: dayAt(day, 18), durationMin: 45, priceKobo: Math.round(t.sessionPriceKobo * 0.8) });
-    });
+  // Two weeks of open slots for every trainer (after Amara's hand-made week).
+  // `npm run db:slots` tops these up later without re-seeding.
+  for (const t of seedTrainers) {
+    for (const s of openSlotPlan(t.slug, t.sessionPriceKobo, now)) {
+      if (t.id === amara && s.startsAt <= dayAt(5, 23)) continue;
+      if (slotSeeds.some((x) => x.trainer === t.id && overlaps(x, s))) continue;
+      slotSeeds.push({ trainer: t.id, ...s });
+    }
   }
 
   let paid = 0;

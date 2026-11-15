@@ -2,6 +2,7 @@ import "server-only";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "./schema";
+import { pgConnectionString } from "./url";
 
 // GuildFit runs as a long-lived Node server (Cloudways), so a regular pg Pool
 // over Neon's pooled connection string is the simplest fit and supports
@@ -9,7 +10,7 @@ import * as schema from "./schema";
 const globalForDb = globalThis as unknown as { pgPool?: Pool };
 
 function createPool() {
-  return new Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
+  return new Pool({ connectionString: pgConnectionString(process.env.DATABASE_URL), max: 10 });
 }
 
 const pool = globalForDb.pgPool ?? createPool();
